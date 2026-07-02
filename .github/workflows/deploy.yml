@@ -143,8 +143,36 @@ jobs:
               fi
             fi
             if ! command -v docker >/dev/null 2>&1; then
-              curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-              sh /tmp/get-docker.sh
+              if command -v apt-get >/dev/null 2>&1; then
+                . /etc/os-release
+                codename="${VERSION_CODENAME:-}"
+                if [ -z "$codename" ] && command -v lsb_release >/dev/null 2>&1; then
+                  codename="$(lsb_release -cs)"
+                fi
+                if [ -z "$codename" ]; then
+                  echo "VERSION_CODENAME is required to configure Docker apt repository"
+                  exit 1
+                fi
+                apt-get update
+                apt-get install -y ca-certificates curl gnupg
+                install -m 0755 -d /etc/apt/keyrings
+                curl --retry 5 --retry-delay 5 -fsSL "https://mirrors.aliyun.com/docker-ce/linux/${ID}/gpg" -o /etc/apt/keyrings/docker.asc
+                chmod a+r /etc/apt/keyrings/docker.asc
+                echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://mirrors.aliyun.com/docker-ce/linux/${ID} ${codename} stable" > /etc/apt/sources.list.d/docker.list
+                apt-get update
+                apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+              elif command -v dnf >/dev/null 2>&1; then
+                dnf install -y dnf-plugins-core || dnf install -y yum-utils
+                dnf config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+                dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+              elif command -v yum >/dev/null 2>&1; then
+                yum install -y yum-utils
+                yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+                yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+              else
+                curl --retry 5 --retry-delay 5 -fsSL https://get.docker.com -o /tmp/get-docker.sh
+                sh /tmp/get-docker.sh
+              fi
             fi
             if command -v systemctl >/dev/null 2>&1; then
               systemctl enable --now docker
