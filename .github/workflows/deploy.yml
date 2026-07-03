@@ -194,6 +194,19 @@ jobs:
             }
             docker version
             compose version
+            if command -v ufw >/dev/null 2>&1; then
+              ufw allow 80/tcp || true
+              ufw allow 443/tcp || true
+            fi
+            if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+              firewall-cmd --permanent --add-service=http || true
+              firewall-cmd --permanent --add-service=https || true
+              firewall-cmd --reload || true
+            fi
+            if command -v iptables >/dev/null 2>&1; then
+              iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 80 -j ACCEPT || true
+              iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport 443 -j ACCEPT || true
+            fi
             for attempt in 1 2 3; do
               compose -f deploy/docker-compose.yml pull postgres redis && break
               if [ "$attempt" -eq 3 ]; then
