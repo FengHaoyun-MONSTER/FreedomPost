@@ -20,6 +20,13 @@ import { createStorageAdapter, getLocalUploadStream } from "./storage.js";
 const sessions = new Map<string, { username: string; createdAt: string }>();
 const rateBuckets = new Map<string, number[]>();
 
+function shouldUseSecureCookies() {
+  if (process.env.COOKIE_SECURE === "false") {
+    return false;
+  }
+  return process.env.NODE_ENV === "production";
+}
+
 const adjectives = ["安静的", "自由的", "清醒的", "温和的", "明亮的", "专注的", "透明的", "从容的"];
 const nouns = ["河流", "山影", "晨光", "星火", "纸页", "远帆", "云层", "石径"];
 
@@ -220,7 +227,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       path: "/",
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: shouldUseSecureCookies(),
       maxAge: 60 * 60 * 24 * 365
     });
 
