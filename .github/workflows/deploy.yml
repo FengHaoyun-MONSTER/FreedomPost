@@ -309,16 +309,16 @@ jobs:
               $SUDO iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || $SUDO iptables -I INPUT -p tcp --dport 443 -j ACCEPT || true
             fi
             for attempt in 1 2 3; do
-              compose -f deploy/docker-compose.yml pull postgres redis && break
+              compose --env-file .env -f deploy/docker-compose.yml pull postgres redis && break
               if [ "$attempt" -eq 3 ]; then
                 exit 1
               fi
               sleep "$((attempt * 20))"
             done
-            compose -f deploy/docker-compose.yml up -d postgres redis
-            compose -f deploy/docker-compose.yml build app nginx
-            compose -f deploy/docker-compose.yml run --rm app npm run db:migrate:prod -w @freedompost/api
-            compose -f deploy/docker-compose.yml up -d --build --force-recreate app nginx
+            compose --env-file .env -f deploy/docker-compose.yml up -d postgres redis
+            compose --env-file .env -f deploy/docker-compose.yml build app nginx
+            compose --env-file .env -f deploy/docker-compose.yml run --rm app npm run db:migrate:prod -w @freedompost/api
+            compose --env-file .env -f deploy/docker-compose.yml up -d --build --force-recreate app nginx
             for attempt in $(seq 1 60); do
               if curl -fsS http://127.0.0.1:3000/health \
                 && curl -kfsSL \
@@ -329,6 +329,6 @@ jobs:
               fi
               sleep 2
             done
-            compose -f deploy/docker-compose.yml ps
-            compose -f deploy/docker-compose.yml logs --tail=120 app nginx
+            compose --env-file .env -f deploy/docker-compose.yml ps
+            compose --env-file .env -f deploy/docker-compose.yml logs --tail=120 app nginx
             exit 1
