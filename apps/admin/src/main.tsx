@@ -225,11 +225,17 @@ function App() {
     template.innerHTML = html;
     const fragment = template.content;
     const lastNode = fragment.lastChild;
+    const insertsRichBlock = Boolean(fragment.querySelector("figure.editor-image,.editor-attachment"));
 
     if (selection?.rangeCount && editor.contains(selection.anchorNode)) {
       const range = selection.getRangeAt(0);
-      range.deleteContents();
-      range.insertNode(fragment);
+      const block = closestEditableBlock(selection.anchorNode, editor);
+      if (insertsRichBlock && block) {
+        block.after(fragment);
+      } else {
+        range.deleteContents();
+        range.insertNode(fragment);
+      }
       if (lastNode) {
         range.setStartAfter(lastNode);
         range.collapse(true);
@@ -241,6 +247,12 @@ function App() {
     }
 
     syncEditorMarkdown();
+  }
+
+  function closestEditableBlock(node: Node | null, editor: HTMLElement): HTMLElement | null {
+    const start = node instanceof HTMLElement ? node : node?.parentElement;
+    const block = start?.closest("p,h1,h2,h3,h4,h5,h6,li,blockquote,pre");
+    return block instanceof HTMLElement && editor.contains(block) ? block : null;
   }
 
   function syncEditorMarkdown() {
@@ -645,6 +657,13 @@ function nodeToMarkdown(node: Node): string {
     return `![${escapeMarkdown(img.alt || "图片")}](${img.src})`;
   }
 
+  if (node.querySelector("figure.editor-image,img,.editor-attachment")) {
+    const childMarkdown = [...node.childNodes].map(nodeToMarkdown).filter((value) => value.trim());
+    if (childMarkdown.length) {
+      return childMarkdown.join("\n\n");
+    }
+  }
+
   if (/^H[1-6]$/.test(node.tagName)) {
     const level = Number(node.tagName.slice(1));
     return `${"#".repeat(level)} ${node.textContent?.trim() ?? ""}`;
@@ -659,13 +678,6 @@ function nodeToMarkdown(node: Node): string {
     return [...node.querySelectorAll(":scope > li")]
       .map((li, index) => `${node.tagName === "OL" ? `${index + 1}.` : "-"} ${li.textContent?.trim() ?? ""}`)
       .join("\n");
-  }
-
-  if (node.querySelector("figure.editor-image,img,.editor-attachment")) {
-    const childMarkdown = [...node.childNodes].map(nodeToMarkdown).filter((value) => value.trim());
-    if (childMarkdown.length) {
-      return childMarkdown.join("\n\n");
-    }
   }
 
   return (node.innerText || node.textContent || "").trim();
