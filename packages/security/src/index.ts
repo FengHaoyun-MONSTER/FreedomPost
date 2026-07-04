@@ -40,6 +40,8 @@ export const allowedUploadExtensions = new Set([
   "css"
 ]);
 
+export const executableUploadExtensions = new Set(["exe", "msi"]);
+
 export const inlineSafeImageMimeTypes = new Set([
   "image/jpeg",
   "image/png",
@@ -59,6 +61,14 @@ export const allowedUploadMimePrefixes = [
   "audio/",
   "video/"
 ];
+
+export const allowedExecutableUploadMimeTypes = new Set([
+  "application/octet-stream",
+  "application/x-msdownload",
+  "application/x-msdos-program",
+  "application/x-msi",
+  "application/vnd.microsoft.portable-executable"
+]);
 
 export function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
@@ -179,9 +189,14 @@ export function fileExtension(filename: string): string {
 
 export function isAllowedUpload(filename: string, mimeType: string): boolean {
   const extension = fileExtension(filename);
-  const knownExtension = allowedUploadExtensions.has(extension);
-  const knownMime = allowedUploadMimePrefixes.some((prefix) => mimeType.startsWith(prefix));
-  return knownExtension && knownMime;
+  const normalizedMime = mimeType.toLowerCase().split(";")[0]?.trim() || "application/octet-stream";
+  const knownMime = allowedUploadMimePrefixes.some((prefix) => normalizedMime.startsWith(prefix));
+
+  if (allowedUploadExtensions.has(extension)) {
+    return knownMime;
+  }
+
+  return executableUploadExtensions.has(extension) && allowedExecutableUploadMimeTypes.has(normalizedMime);
 }
 
 export function isInlineSafeCommentImage(input: {

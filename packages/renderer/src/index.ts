@@ -101,6 +101,21 @@ export function createMarkdownRenderer(toc: TocItem[], usedIds: Map<string, numb
     )}">${numbered}</code></pre></div>`;
   };
 
+  md.renderer.rules.image = (tokens, idx, options, env, self) => {
+    const token = tokens[idx];
+    if (!token) return "";
+
+    token.attrSet("loading", "lazy");
+    token.attrSet("alt", token.content);
+    const imageHtml = self.renderToken(tokens, idx, options);
+    const src = token.attrGet("src");
+    if (!src || tokens[idx - 1]?.type === "link_open") {
+      return imageHtml;
+    }
+
+    return `<a class="article-image-link" href="${escapeHtml(src)}" target="_blank" rel="noreferrer noopener">${imageHtml}</a>`;
+  };
+
   return md;
 }
 

@@ -101,6 +101,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     reply.header("Content-Type", file.contentType);
     reply.header("Content-Length", String(file.size));
     reply.header("X-Content-Type-Options", "nosniff");
+    if (!file.contentType.startsWith("image/")) {
+      const filename = encodeURIComponent(request.params["*"].split("/").pop() ?? "download");
+      reply.header("Content-Disposition", `attachment; filename*=UTF-8''${filename}`);
+    }
     return reply.send(file.stream);
   });
 

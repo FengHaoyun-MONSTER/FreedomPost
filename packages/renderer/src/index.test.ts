@@ -15,4 +15,18 @@ describe("renderMarkdownArticle", () => {
     expect(result.html).not.toContain("<script>");
     expect(result.html).toContain("code-block");
   });
+
+  it("renders images as links to the original asset", () => {
+    const result = renderMarkdownArticle({
+      slug: "image",
+      title: "Image",
+      markdown: "![screenshot](https://pic.example.com/a.png)",
+      createdAt: "2026-07-02T00:00:00.000Z",
+      updatedAt: "2026-07-02T00:00:00.000Z"
+    });
+
+    expect(result.html).toContain('class="article-image-link"');
+    expect(result.html).toContain('href="https://pic.example.com/a.png"');
+    expect(result.html).toContain('src="https://pic.example.com/a.png"');
+  });
 });

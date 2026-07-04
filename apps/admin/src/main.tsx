@@ -194,16 +194,24 @@ function App() {
       .map((item) => item.getAsFile())
       .filter((file): file is File => Boolean(file));
 
-    if (!files.length) return;
+    if (files.length) {
+      event.preventDefault();
+      try {
+        const snippets = await Promise.all(files.map(fileToEditorHtml));
+        insertHtmlAtCaret(snippets.join(""));
+        showToast("图片已上传并插入");
+      } catch {
+        showToast("图片上传失败");
+      }
+      return;
+    }
+
+    const htmlWithImages = await pastedHtmlToEditorHtml(event.clipboardData.getData("text/html"));
+    if (!htmlWithImages) return;
 
     event.preventDefault();
-    try {
-      const snippets = await Promise.all(files.map(fileToEditorHtml));
-      insertHtmlAtCaret(snippets.join(""));
-      showToast("图片已上传并插入");
-    } catch {
-      showToast("图片上传失败");
-    }
+    insertHtmlAtCaret(htmlWithImages);
+    showToast("图片已上传并插入");
   }
 
   function insertHtmlAtCaret(html: string) {
@@ -398,10 +406,53 @@ function App() {
 async function fileToEditorHtml(file: File): Promise<string> {
   const uploaded = await uploadFile(file);
   if (uploaded.mimeType.startsWith("image/")) {
-    return `<figure class="editor-image" data-fp-type="image"><img src="${escapeAttribute(uploaded.url)}" alt="${escapeAttribute(uploaded.name)}" /><figcaption>${escapeHtml(uploaded.name)}</figcaption></figure><p><br></p>`;
+    return `${editorImageHtml(uploaded.url, uploaded.name)}<p><br></p>`;
   }
 
   return `<div class="editor-attachment" data-fp-type="attachment" data-name="${escapeAttribute(uploaded.name)}" data-href="${escapeAttribute(uploaded.url)}" contenteditable="false"><span>${escapeHtml(uploaded.name)}</span><a href="${escapeAttribute(uploaded.url)}" download="${escapeAttribute(uploaded.name)}">下载 / 查看</a></div><p><br></p>`;
+}
+
+async function pastedHtmlToEditorHtml(html: string): Promise<string | null> {
+  if (!html || !/<img[\s>]/i.test(html)) return null;
+
+  const template = document.createElement("template");
+  template.innerHTML = html;
+  template.content.querySelectorAll("script,style").forEach((node) => node.remove());
+  const images = [...template.content.querySelectorAll<HTMLImageElement>("img")];
+  let replaced = false;
+
+  for (const image of images) {
+    const src = image.getAttribute("src") ?? "";
+    const alt = image.getAttribute("alt") || image.getAttribute("title") || filenameFromUrl(src) || "image.png";
+    const uploaded = await uploadEmbeddedImage(src, alt);
+    const imageUrl = uploaded?.url ?? normalizeImageSource(src);
+
+    if (!imageUrl) continue;
+
+    const replacement = document.createElement("template");
+    replacement.innerHTML = editorImageHtml(imageUrl, uploaded?.name ?? alt);
+    image.replaceWith(replacement.content);
+    replaced = true;
+  }
+
+  return replaced ? template.innerHTML : null;
+}
+
+async function uploadEmbeddedImage(src: string, name: string): Promise<UploadedFile | null> {
+  if (!src.startsWith("data:") && !src.startsWith("blob:")) {
+    return null;
+  }
+
+  const response = await fetch(src);
+  const blob = await response.blob();
+  const file = new File([blob], filenameWithImageExtension(name, blob.type), { type: blob.type || "image/png" });
+  return uploadFile(file);
+}
+
+function editorImageHtml(url: string, name: string): string {
+  const safeUrl = escapeAttribute(url);
+  const safeName = escapeAttribute(name || "image.png");
+  return `<figure class="editor-image" data-fp-type="image"><a href="${safeUrl}" target="_blank" rel="noreferrer noopener"><img src="${safeUrl}" alt="${safeName}" /></a><figcaption>${escapeHtml(name || "image.png")}</figcaption></figure>`;
 }
 
 async function uploadFile(file: File): Promise<UploadedFile> {
@@ -445,6 +496,45 @@ function normalizeOrigin(value: string | undefined): string | null {
   }
 }
 
+function normalizeImageSource(src: string): string | null {
+  if (!src) return null;
+
+  try {
+    const url = new URL(src, location.origin);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function filenameFromUrl(src: string): string | null {
+  if (!src) return null;
+
+  try {
+    const url = new URL(src, location.origin);
+    return decodeURIComponent(url.pathname.split("/").pop() || "") || null;
+  } catch {
+    return null;
+  }
+}
+
+function filenameWithImageExtension(name: string, mimeType: string): string {
+  const cleanName = name.trim() || "image";
+  if (/\.[a-z0-9]{2,5}$/i.test(cleanName)) {
+    return cleanName;
+  }
+
+  const extensions: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp",
+    "image/svg+xml": "svg"
+  };
+
+  return `${cleanName}.${extensions[mimeType.toLowerCase().split(";")[0] ?? ""] ?? "png"}`;
+}
+
 function markdownToEditorHtml(markdown: string): string {
   const lines = markdown.split(/\r?\n/);
   const html: string[] = [];
@@ -486,7 +576,7 @@ function markdownToEditorHtml(markdown: string): string {
     const image = line.match(/^!\[(.*)]\((.*)\)$/);
     if (image) {
       flushParagraph();
-      html.push(`<figure class="editor-image" data-fp-type="image"><img src="${escapeAttribute(image[2] ?? "")}" alt="${escapeAttribute(image[1] ?? "")}" /><figcaption>${escapeHtml(image[1] ?? "")}</figcaption></figure>`);
+      html.push(editorImageHtml(image[2] ?? "", image[1] ?? "image.png"));
       continue;
     }
 
@@ -569,6 +659,13 @@ function nodeToMarkdown(node: Node): string {
     return [...node.querySelectorAll(":scope > li")]
       .map((li, index) => `${node.tagName === "OL" ? `${index + 1}.` : "-"} ${li.textContent?.trim() ?? ""}`)
       .join("\n");
+  }
+
+  if (node.querySelector("figure.editor-image,img,.editor-attachment")) {
+    const childMarkdown = [...node.childNodes].map(nodeToMarkdown).filter((value) => value.trim());
+    if (childMarkdown.length) {
+      return childMarkdown.join("\n\n");
+    }
   }
 
   return (node.innerText || node.textContent || "").trim();

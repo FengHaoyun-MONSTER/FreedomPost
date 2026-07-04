@@ -307,6 +307,11 @@ button:hover {
   object-fit: contain;
 }
 
+.editor-image a {
+  display: inline-block;
+  max-width: 100%;
+}
+
 .editor-image figcaption {
   margin-top: 6px;
   color: #667085;

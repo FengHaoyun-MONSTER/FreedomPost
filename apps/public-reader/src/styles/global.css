@@ -481,6 +481,11 @@ mark {
   border-radius: 8px;
 }
 
+.article-image-link {
+  display: inline-block;
+  max-width: 100%;
+}
+
 .attachment-card {
   display: flex;
   align-items: center;
