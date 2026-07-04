@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import {
   Bold,
   Code2,
-  Copy,
   Italic,
   Link2,
   LogOut,
@@ -211,12 +210,6 @@ function App() {
   function patchActivePost(patch: Partial<AdminPost>) {
     if (!activePost) return;
     setPosts((items) => items.map((item) => (item.id === activePost.id ? { ...item, ...patch } : item)));
-  }
-
-  async function copyLink() {
-    if (!activePost) return;
-    await navigator.clipboard.writeText(publicArticleUrl(activePost.slug)).catch(() => undefined);
-    showToast("链接已复制");
   }
 
   async function handleAttachmentFiles(files: FileList | null) {
@@ -458,156 +451,12 @@ function App() {
                 <strong>{activePost.title}</strong>
                 <span>/p/{activePost.slug}</span>
               </div>
-              <div className="topbar-actions">
-                <button type="button" onClick={copyLink}>
-                  <Copy size={15} />
-                  复制
-                </button>
-                <button type="button" onClick={deletePost}>
-                  <Trash2 size={15} />
-                  删除
-                </button>
-                <button className="primary" type="button" onClick={savePost}>
-                  <Save size={15} />
-                  保存
-                </button>
-              </div>
             </header>
             <div className="editor-workspace">
               <label className="title-field">
                 <span>标题</span>
                 <input value={activePost.title} onChange={(event) => patchActivePost({ title: event.target.value })} />
               </label>
-              <div className="toolbar" aria-label="编辑工具栏">
-                <label className="toolbar-field">
-                  <Type size={15} aria-hidden="true" />
-                  <select
-                    aria-label="标题级别"
-                    defaultValue="p"
-                    onChange={(event) => {
-                      applyBlockFormat(event.target.value);
-                      event.target.value = "p";
-                    }}
-                  >
-                    {headingOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <span className="toolbar-divider" />
-                <button
-                  className="icon-button"
-                  type="button"
-                  title="加粗"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => runEditorCommand("bold")}
-                >
-                  <Bold size={16} />
-                </button>
-                <button
-                  className="icon-button"
-                  type="button"
-                  title="删除线"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => runEditorCommand("strikeThrough")}
-                >
-                  <Strikethrough size={16} />
-                </button>
-                <button
-                  className="icon-button"
-                  type="button"
-                  title="斜体"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => runEditorCommand("italic")}
-                >
-                  <Italic size={16} />
-                </button>
-                <button
-                  className="icon-button"
-                  type="button"
-                  title="下划线"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => runEditorCommand("underline")}
-                >
-                  <Underline size={16} />
-                </button>
-                <button
-                  className="icon-button"
-                  type="button"
-                  title="插入链接"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={createLinkAtSelection}
-                >
-                  <Link2 size={16} />
-                </button>
-                <button
-                  className="icon-button"
-                  type="button"
-                  title="代码块"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={insertCodeBlock}
-                >
-                  <Code2 size={16} />
-                </button>
-                <label className="toolbar-field">
-                  <span>字号</span>
-                  <select
-                    aria-label="字号"
-                    defaultValue=""
-                    onChange={(event) => {
-                      if (event.target.value) {
-                        applyInlineClass(event.target.value);
-                      }
-                      event.target.value = "";
-                    }}
-                  >
-                    <option value="" disabled>
-                      选择
-                    </option>
-                    {sizeOptions.map((option) => (
-                      <option key={option.className} value={option.className}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="color-group" role="group" aria-label="字体颜色">
-                  {colorOptions.map((option) => (
-                    <button
-                      key={option.className}
-                      className={`swatch-button ${option.className}`}
-                      type="button"
-                      title={option.label}
-                      aria-label={option.label}
-                      onMouseDown={(event) => event.preventDefault()}
-                      onClick={() => applyInlineClass(option.className)}
-                    >
-                      <span />
-                    </button>
-                  ))}
-                </div>
-                <span className="toolbar-divider" />
-                <button
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => attachmentInputRef.current?.click()}
-                >
-                  <Upload size={15} />
-                  附件
-                </button>
-                <input
-                  ref={attachmentInputRef}
-                  className="hidden-input"
-                  type="file"
-                  multiple
-                  onChange={(event) => {
-                    void handleAttachmentFiles(event.target.files);
-                    event.target.value = "";
-                  }}
-                />
-              </div>
               <div
                 ref={editorRef}
                 className="rich-editor"
@@ -618,6 +467,145 @@ function App() {
                 onInput={syncEditorMarkdown}
                 onPaste={handleEditorPaste}
               />
+            </div>
+            <div className="toolbar" aria-label="编辑工具栏">
+              <label className="toolbar-field">
+                <Type size={15} aria-hidden="true" />
+                <select
+                  aria-label="标题级别"
+                  defaultValue="p"
+                  onChange={(event) => {
+                    applyBlockFormat(event.target.value);
+                    event.target.value = "p";
+                  }}
+                >
+                  {headingOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <span className="toolbar-divider" />
+              <button
+                className="icon-button"
+                type="button"
+                title="加粗"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => runEditorCommand("bold")}
+              >
+                <Bold size={16} />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                title="删除线"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => runEditorCommand("strikeThrough")}
+              >
+                <Strikethrough size={16} />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                title="斜体"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => runEditorCommand("italic")}
+              >
+                <Italic size={16} />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                title="下划线"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => runEditorCommand("underline")}
+              >
+                <Underline size={16} />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                title="插入链接"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={createLinkAtSelection}
+              >
+                <Link2 size={16} />
+              </button>
+              <button
+                className="icon-button"
+                type="button"
+                title="代码块"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={insertCodeBlock}
+              >
+                <Code2 size={16} />
+              </button>
+              <label className="toolbar-field">
+                <span>字号</span>
+                <select
+                  aria-label="字号"
+                  defaultValue=""
+                  onChange={(event) => {
+                    if (event.target.value) {
+                      applyInlineClass(event.target.value);
+                    }
+                    event.target.value = "";
+                  }}
+                >
+                  <option value="" disabled>
+                    选择
+                  </option>
+                  {sizeOptions.map((option) => (
+                    <option key={option.className} value={option.className}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="color-group" role="group" aria-label="字体颜色">
+                {colorOptions.map((option) => (
+                  <button
+                    key={option.className}
+                    className={`swatch-button ${option.className}`}
+                    type="button"
+                    title={option.label}
+                    aria-label={option.label}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => applyInlineClass(option.className)}
+                  >
+                    <span />
+                  </button>
+                ))}
+              </div>
+              <span className="toolbar-divider" />
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => attachmentInputRef.current?.click()}
+              >
+                <Upload size={15} />
+                附件
+              </button>
+              <input
+                ref={attachmentInputRef}
+                className="hidden-input"
+                type="file"
+                multiple
+                onChange={(event) => {
+                  void handleAttachmentFiles(event.target.files);
+                  event.target.value = "";
+                }}
+              />
+              <span className="toolbar-fill" />
+              <button className="danger-button" type="button" onClick={deletePost}>
+                <Trash2 size={15} />
+                删除
+              </button>
+              <button className="primary" type="button" onClick={savePost}>
+                <Save size={15} />
+                保存
+              </button>
             </div>
           </>
         ) : (
@@ -697,29 +685,6 @@ async function uploadFile(file: File): Promise<UploadedFile> {
 
   const payload = (await response.json()) as { file: UploadedFile };
   return payload.file;
-}
-
-function publicOrigin(): string {
-  const configuredOrigin = normalizeOrigin(import.meta.env.VITE_PUBLIC_SITE_URL);
-  if (configuredOrigin) {
-    return configuredOrigin;
-  }
-
-  if (location.port === "5173") {
-    return `${location.protocol}//${location.hostname}:4321`;
-  }
-
-  return location.origin;
-}
-
-function normalizeOrigin(value: string | undefined): string | null {
-  if (!value) return null;
-
-  try {
-    return new URL(value).origin;
-  } catch {
-    return null;
-  }
 }
 
 function normalizeImageSource(src: string): string | null {
@@ -1007,14 +972,6 @@ function escapeHtml(value: string): string {
 
 function escapeAttribute(value: string): string {
   return escapeHtml(value).replaceAll("\n", "&#10;");
-}
-
-function publicArticleUrl(slug: string): string {
-  if (location.port === "5173") {
-    return `${publicOrigin()}/?post=${encodeURIComponent(slug)}`;
-  }
-
-  return `${publicOrigin()}/p/${slug}`;
 }
 
 function formatDate(value: string): string {
