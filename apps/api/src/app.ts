@@ -141,6 +141,52 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     nextCursor: null
   }));
 
+  app.post<{ Params: { slug: string } }>("/api/posts/:slug/comment-attachments", async (request, reply) => {
+    const post = await repository.getPostBySlug(request.params.slug);
+    if (!post) {
+      return reply.code(404).send(errorBody("POST_NOT_FOUND", "文章不存在"));
+    }
+
+    const file = await request.file();
+    if (!file) {
+      return reply.code(400).send(errorBody("NO_FILE", "请选择要上传的文件"));
+    }
+
+    try {
+      const buffer = await file.toBuffer();
+      if (buffer.byteLength > COMMENT_ATTACHMENT_MAX_BYTES) {
+        return reply.code(413).send(errorBody("ATTACHMENT_TOO_LARGE", "附件不能超过 500MB"));
+      }
+
+      const stored = await storage.putObject({
+        buffer,
+        originalFilename: file.filename,
+        mimeType: file.mimetype || "application/octet-stream",
+        namespace: "comments"
+      });
+
+      return {
+        file: {
+          id: stored.sha256,
+          name: stored.originalFilename,
+          mimeType: stored.mimeType,
+          sizeBytes: stored.sizeBytes,
+          url: stored.publicUrl,
+          storageProvider: stored.storageProvider,
+          storageKey: stored.storageKey,
+          storedFilename: stored.storedFilename,
+          sha256: stored.sha256
+        }
+      };
+    } catch (error) {
+      if (error instanceof UploadRejectedError) {
+        return reply.code(400).send(errorBody("UNSUPPORTED_UPLOAD", "不支持的文件类型"));
+      }
+      request.log.error(error);
+      return reply.code(500).send(errorBody("UPLOAD_FAILED", "附件上传失败"));
+    }
+  });
+
   app.post<{
     Params: { slug: string };
     Body: {
@@ -159,7 +205,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     }
 
     const rawContent = request.body?.content ?? "";
-    const attachments = request.body?.attachments ?? [];
+    const attachments = normalizeCommentAttachments(request.body?.attachments);
     const attachmentBytes = attachments.reduce((sum, item) => sum + item.sizeBytes, 0);
 
     if (!rawContent.trim() && attachments.length === 0) {
@@ -399,4 +445,48 @@ function errorBody(code: string, message: string) {
       message
     }
   };
+}
+
+function normalizeCommentAttachments(value: unknown): Comment["attachments"] {
+  if (!Array.isArray(value)) return [];
+
+  return value.slice(0, 10).flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const source = item as Partial<Comment["attachments"][number]>;
+    const name = String(source.name ?? "").trim().slice(0, 240);
+    const mimeType = String(source.mimeType ?? "").trim().slice(0, 255) || "application/octet-stream";
+    const sizeBytes = Number(source.sizeBytes);
+    const url = String(source.url ?? "").trim();
+
+    if (!name || !Number.isFinite(sizeBytes) || sizeBytes < 0 || !isSafeAttachmentUrl(url)) {
+      return [];
+    }
+
+    return [
+      {
+        id: String(source.id ?? crypto.randomUUID()).slice(0, 128),
+        name,
+        mimeType,
+        sizeBytes,
+        url,
+        ...(source.storageProvider === "local" || source.storageProvider === "oss"
+          ? { storageProvider: source.storageProvider }
+          : {}),
+        ...(source.storageKey ? { storageKey: String(source.storageKey).slice(0, 1024) } : {}),
+        ...(source.storedFilename ? { storedFilename: String(source.storedFilename).slice(0, 255) } : {}),
+        ...(source.sha256 ? { sha256: String(source.sha256).slice(0, 128) } : {})
+      }
+    ];
+  });
+}
+
+function isSafeAttachmentUrl(url: string): boolean {
+  if (url.startsWith("/api/uploads/")) return true;
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
 }

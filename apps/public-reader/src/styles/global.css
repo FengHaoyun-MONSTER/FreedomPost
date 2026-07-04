@@ -720,12 +720,41 @@ mark {
   font-size: 13px;
 }
 
+.comment-image-link {
+  display: inline-flex;
+}
+
 .comment-attachments img {
   max-width: 130px;
   max-height: 100px;
   object-fit: cover;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.comment-attachment-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  max-width: min(360px, 100%);
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--panel-soft);
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comment-attachment-link:hover {
+  border-color: color-mix(in srgb, var(--accent), transparent 45%);
+  background: var(--accent-soft);
+}
+
+.comment-attachment-link.disabled {
+  color: var(--muted);
+  cursor: default;
 }
 
 .reply-btn {

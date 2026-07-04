@@ -45,15 +45,26 @@ type ArticleCacheItem = {
 };
 
 type StoredCommentAttachment = {
+  id?: string;
   name: string;
-  type: string;
-  size: number;
+  type?: string;
+  mimeType?: string;
+  size?: number;
+  sizeBytes?: number;
   url?: string;
+  storageProvider?: "local" | "oss";
+  storageKey?: string;
+  storedFilename?: string;
+  sha256?: string;
 };
 
 type StoredComment = {
   id: string;
+  postSlug?: string;
   parentId: string | null;
+  rootId?: string | null;
+  depth?: number;
+  path?: string;
   username: string;
   content: string;
   attachments: StoredCommentAttachment[];
@@ -109,6 +120,7 @@ let toastTimer = 0;
 let headingObserver: IntersectionObserver | null = null;
 
 const articleCache = new Map<string, ArticleCacheItem>();
+const commentCache = new Map<string, StoredComment[]>();
 
 if (initial) {
   articleCache.set(initial.slug, {
@@ -130,6 +142,7 @@ async function init() {
   enhanceCodeBlocks();
   renderToc(initial?.toc ?? []);
   renderComments();
+  void refreshComments(activeSlug);
   bindEvents();
 
   try {
@@ -288,6 +301,7 @@ async function openArticle(
   renderToc(cached.toc);
   enhanceCodeBlocks();
   renderComments();
+  void refreshComments(slug);
   renderList();
   readerScroll.scrollTop = 0;
 
@@ -385,6 +399,22 @@ async function refreshPostsFromApi() {
     renderList();
   } catch {
     // Static fallback already covers offline API; focus refresh can fail quietly.
+  }
+}
+
+async function refreshComments(slug: string) {
+  if (!slug) return;
+
+  try {
+    const payload = await fetchJson<{ items: StoredComment[] }>(`/api/posts/${encodeURIComponent(slug)}/comments`);
+    commentCache.set(slug, payload.items.map(normalizeComment));
+    if (slug === activeSlug) {
+      renderComments();
+      renderList();
+      updateCommentCounts();
+    }
+  } catch {
+    // Local cached comments remain visible if the API is unavailable.
   }
 }
 
@@ -488,7 +518,7 @@ function enhanceCodeBlocks() {
   });
 }
 
-function submitComment(event: SubmitEvent) {
+async function submitComment(event: SubmitEvent) {
   event.preventDefault();
   const content = commentText.value.trim();
   const files = [...(commentFiles.files ?? [])];
@@ -506,32 +536,68 @@ function submitComment(event: SubmitEvent) {
 
   if (!checkCommentRate(activeSlug)) return;
 
-  const comment: StoredComment = {
-    id: crypto.randomUUID?.() ?? `${Date.now()}`,
-    parentId: replyParentId,
-    username: getRandomUsername(),
-    content,
-    attachments: files.map((file) => ({
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      url: URL.createObjectURL(file)
-    })),
-    createdAt: new Date().toISOString()
-  };
+  const submitButton = commentForm.querySelector<HTMLButtonElement>('button[type="submit"]');
+  submitButton?.setAttribute("disabled", "true");
 
-  const all = getCommentStore();
-  all[activeSlug] = [...(all[activeSlug] ?? []), comment];
-  localStorage.setItem(storageKeys.comments, JSON.stringify(all));
+  try {
+    const attachments = await Promise.all(files.map(uploadCommentAttachment));
+    const comment = await createRemoteComment(content, attachments);
+    commentCache.set(activeSlug, [...getComments(activeSlug), comment]);
 
-  replyParentId = null;
-  commentText.value = "";
-  commentText.placeholder = "写下评论";
-  commentFiles.value = "";
-  renderComments();
-  renderList();
-  updateCommentCounts();
-  showToast("评论已发布");
+    replyParentId = null;
+    commentText.value = "";
+    commentText.placeholder = "写下评论";
+    commentFiles.value = "";
+    renderComments();
+    renderList();
+    updateCommentCounts();
+    showToast("评论已发布");
+  } catch {
+    showToast("评论发布失败，请稍后重试");
+  } finally {
+    submitButton?.removeAttribute("disabled");
+  }
+}
+
+async function uploadCommentAttachment(file: File): Promise<StoredCommentAttachment> {
+  const formData = new FormData();
+  formData.set("file", file);
+
+  const response = await fetch(`/api/posts/${encodeURIComponent(activeSlug)}/comment-attachments`, {
+    method: "POST",
+    body: formData
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to upload comment attachment");
+  }
+
+  const payload = (await response.json()) as { file: StoredCommentAttachment };
+  return normalizeAttachment(payload.file);
+}
+
+async function createRemoteComment(
+  content: string,
+  attachments: StoredCommentAttachment[]
+): Promise<StoredComment> {
+  const response = await fetch(`/api/posts/${encodeURIComponent(activeSlug)}/comments`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      parentId: replyParentId,
+      content,
+      attachments,
+      localId: getDeviceId()
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to create comment");
+  }
+
+  return normalizeComment((await response.json()) as StoredComment);
 }
 
 function renderComments() {
@@ -558,15 +624,7 @@ function renderComment(comment: StoredComment, all: StoredComment[], level: numb
     .filter((item) => item.parentId === comment.id)
     .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
   const attachments = comment.attachments
-    .map((file) => {
-      const isSmallImage = file.url && file.type.startsWith("image/") && file.size <= 2 * 1024 * 1024;
-      if (isSmallImage) {
-        return `<a href="${escapeHtml(file.url ?? "")}" target="_blank" rel="noreferrer"><img src="${escapeHtml(
-          file.url ?? ""
-        )}" alt="${escapeHtml(file.name)}" /></a>`;
-      }
-      return `<span class="tool-button">${escapeHtml(file.name)}</span>`;
-    })
+    .map((file) => renderCommentAttachment(normalizeAttachment(file)))
     .join("");
 
   return `<div class="comment ${level > 0 ? "reply" : ""}">
@@ -582,6 +640,52 @@ function renderComment(comment: StoredComment, all: StoredComment[], level: numb
     <div class="comment-attachments">${attachments}</div>
     ${replies.map((reply) => renderComment(reply, all, level + 1)).join("")}
   </div>`;
+}
+
+function renderCommentAttachment(file: StoredCommentAttachment): string {
+  const url = file.url ?? "";
+  const mimeType = attachmentMimeType(file);
+  const sizeBytes = attachmentSizeBytes(file);
+  const isSmallImage = url && mimeType.startsWith("image/") && sizeBytes <= 2 * 1024 * 1024;
+
+  if (isSmallImage) {
+    return `<a class="comment-image-link" href="${escapeHtml(url)}" target="_blank" rel="noreferrer noopener"><img src="${escapeHtml(
+      url
+    )}" alt="${escapeHtml(file.name)}" /></a>`;
+  }
+
+  if (url) {
+    return `<a class="comment-attachment-link" href="${escapeHtml(url)}" target="_blank" rel="noreferrer noopener" download="${escapeHtml(
+      file.name
+    )}">${escapeHtml(file.name)}</a>`;
+  }
+
+  return `<span class="comment-attachment-link disabled">${escapeHtml(file.name)}</span>`;
+}
+
+function normalizeComment(comment: StoredComment): StoredComment {
+  return {
+    ...comment,
+    parentId: comment.parentId ?? null,
+    attachments: (comment.attachments ?? []).map(normalizeAttachment)
+  };
+}
+
+function normalizeAttachment(file: StoredCommentAttachment): StoredCommentAttachment {
+  return {
+    ...file,
+    name: file.name || "attachment",
+    mimeType: attachmentMimeType(file),
+    sizeBytes: attachmentSizeBytes(file)
+  };
+}
+
+function attachmentMimeType(file: StoredCommentAttachment): string {
+  return file.mimeType ?? file.type ?? "application/octet-stream";
+}
+
+function attachmentSizeBytes(file: StoredCommentAttachment): number {
+  return file.sizeBytes ?? file.size ?? 0;
 }
 
 function checkCommentRate(slug: string): boolean {
@@ -623,7 +727,7 @@ function currentCommentCount(meta: ArticleMeta): number {
 }
 
 function getComments(slug: string): StoredComment[] {
-  return getCommentStore()[slug] ?? [];
+  return commentCache.get(slug) ?? (getCommentStore()[slug] ?? []).map(normalizeComment);
 }
 
 function getCommentStore(): Record<string, StoredComment[]> {
@@ -692,7 +796,8 @@ function initResizer() {
 }
 
 function applyStoredTheme() {
-  const theme = localStorage.getItem(storageKeys.theme) === "dark" ? "dark" : "light";
+  const saved = localStorage.getItem(storageKeys.theme);
+  const theme = saved === "light" || saved === "dark" ? saved : "dark";
   document.documentElement.dataset.theme = theme;
   themeBtn.innerHTML = theme === "dark" ? '<i data-lucide="sun"></i>' : '<i data-lucide="moon"></i>';
 }

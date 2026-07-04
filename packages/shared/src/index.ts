@@ -64,6 +64,10 @@ export interface CommentAttachment {
   mimeType: string;
   sizeBytes: number;
   url: string;
+  storageProvider?: "local" | "oss";
+  storageKey?: string;
+  storedFilename?: string;
+  sha256?: string;
 }
 
 export interface Comment {

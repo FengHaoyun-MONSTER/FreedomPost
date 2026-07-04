@@ -1,7 +1,8 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import {
+  attachments as attachmentsTable,
   comments as commentsTable,
   postViews as postViewsTable,
   posts as postsTable
@@ -27,6 +28,7 @@ import type {
 type Db = NodePgDatabase;
 type PostRow = typeof postsTable.$inferSelect;
 type CommentRow = typeof commentsTable.$inferSelect;
+type AttachmentRow = typeof attachmentsTable.$inferSelect;
 
 export class PostgresContentRepository implements ContentRepository {
   private readonly pool: Pool;
@@ -185,7 +187,25 @@ export class PostgresContentRepository implements ContentRepository {
       .where(eq(commentsTable.postId, post.id))
       .orderBy(desc(commentsTable.createdAt), commentsTable.path);
 
-    return rows.map((row) => mapCommentRow(row, post.slug));
+    const commentIds = rows.map((row) => row.id);
+    const attachmentRows = commentIds.length
+      ? await this.db
+          .select()
+          .from(attachmentsTable)
+          .where(and(eq(attachmentsTable.ownerType, "comment"), inArray(attachmentsTable.ownerId, commentIds)))
+          .orderBy(attachmentsTable.createdAt)
+      : [];
+    const attachmentsByComment = new Map<string, AttachmentRow[]>();
+
+    for (const attachment of attachmentRows) {
+      if (!attachment.ownerId) continue;
+      attachmentsByComment.set(attachment.ownerId, [
+        ...(attachmentsByComment.get(attachment.ownerId) ?? []),
+        attachment
+      ]);
+    }
+
+    return rows.map((row) => mapCommentRow(row, post.slug, attachmentsByComment.get(row.id) ?? []));
   }
 
   async createComment(input: CreateCommentInput): Promise<Comment | null> {
@@ -224,15 +244,36 @@ export class PostgresContentRepository implements ContentRepository {
       throw new Error("Failed to insert comment");
     }
 
+    const attachmentRows =
+      input.attachments.length > 0
+        ? await this.db
+            .insert(attachmentsTable)
+            .values(
+              input.attachments.map((attachment) => ({
+                id: crypto.randomUUID(),
+                ownerType: "comment",
+                ownerId: row.id,
+                uploaderType: "public-comment",
+                originalFilename: attachment.name,
+                storedFilename: attachment.storedFilename ?? attachment.name,
+                storageProvider: attachment.storageProvider ?? inferStorageProvider(attachment.url),
+                storageKey: attachment.storageKey ?? attachment.url,
+                publicUrl: attachment.url,
+                mimeType: attachment.mimeType,
+                detectedMimeType: attachment.mimeType,
+                sizeBytes: attachment.sizeBytes,
+                sha256: attachment.sha256 ?? shaFromAttachmentId(attachment.id)
+              }))
+            )
+            .returning()
+        : [];
+
     await this.db
       .update(postsTable)
       .set({ commentCount: sql`${postsTable.commentCount} + 1` })
       .where(eq(postsTable.id, post.id));
 
-    return {
-      ...mapCommentRow(row, post.slug),
-      attachments: input.attachments
-    };
+    return mapCommentRow(row, post.slug, attachmentRows);
   }
 
   private async uniqueSlug(title: string): Promise<string> {
@@ -260,7 +301,7 @@ function mapPostRow(row: PostRow): StoredPost {
   });
 }
 
-function mapCommentRow(row: CommentRow, postSlug: string): Comment {
+function mapCommentRow(row: CommentRow, postSlug: string, attachments: AttachmentRow[] = []): Comment {
   return {
     id: row.id,
     postSlug,
@@ -270,11 +311,33 @@ function mapCommentRow(row: CommentRow, postSlug: string): Comment {
     path: row.path,
     username: row.username,
     content: row.content ?? "",
-    attachments: [],
+    attachments: attachments.map(mapCommentAttachmentRow),
     createdAt: toIso(row.createdAt)
   };
 }
 
 function toIso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : value;
+}
+
+function mapCommentAttachmentRow(row: AttachmentRow): Comment["attachments"][number] {
+  return {
+    id: row.id,
+    name: row.originalFilename,
+    mimeType: row.mimeType,
+    sizeBytes: row.sizeBytes,
+    url: row.publicUrl,
+    storageKey: row.storageKey,
+    storedFilename: row.storedFilename,
+    ...(row.storageProvider === "local" || row.storageProvider === "oss" ? { storageProvider: row.storageProvider } : {}),
+    ...(row.sha256 ? { sha256: row.sha256 } : {})
+  };
+}
+
+function inferStorageProvider(url: string): "local" | "oss" {
+  return url.startsWith("/") ? "local" : "oss";
+}
+
+function shaFromAttachmentId(id: string): string | null {
+  return /^[a-f0-9]{64}$/i.test(id) ? id : null;
 }
