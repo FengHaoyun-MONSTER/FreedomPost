@@ -149,6 +149,10 @@ async function init() {
   renderComments();
   void refreshComments(activeSlug);
   bindEvents();
+  const shouldHydrateRequestedArticle = Boolean(initial && initial.slug !== activeSlug && activeSlug);
+  const requestedArticleHydration = shouldHydrateRequestedArticle
+    ? openArticle(activeSlug, { push: false, countView: false })
+    : Promise.resolve();
 
   try {
     const [postItems, searchPayload] = await Promise.all([fetchPostSummaries(), fetchSearchPayload()]);
@@ -162,9 +166,15 @@ async function init() {
           ? requestedSlug
           : posts[0]?.slug;
       if (nextSlug) {
-        articleCache.delete(nextSlug);
-        await openArticle(nextSlug, { push: location.pathname.startsWith("/p/") && nextSlug !== activeSlug });
+        if (shouldHydrateRequestedArticle && nextSlug === activeSlug) {
+          await requestedArticleHydration;
+        } else {
+          articleCache.delete(nextSlug);
+          await openArticle(nextSlug, { push: location.pathname.startsWith("/p/") && nextSlug !== activeSlug });
+        }
       }
+    } else {
+      await requestedArticleHydration;
     }
     prefetchIdleArticles();
   } catch {
@@ -297,7 +307,10 @@ async function openArticle(
   options: { push?: boolean; countView?: boolean } = {}
 ) {
   const cached = articleCache.get(slug) ?? (await prefetchArticle(slug));
-  if (!cached) return;
+  if (!cached) {
+    document.documentElement.classList.remove("article-boot-pending");
+    return;
+  }
 
   activeSlug = slug;
   articleBody.innerHTML = cached.html;
@@ -325,6 +338,8 @@ async function openArticle(
   if (options.push && location.pathname !== `/p/${slug}`) {
     history.pushState(null, "", `/p/${slug}`);
   }
+
+  document.documentElement.classList.remove("article-boot-pending");
 }
 
 async function prefetchArticle(slug: string) {

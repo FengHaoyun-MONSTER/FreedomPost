@@ -376,6 +376,23 @@ mark {
   overflow-y: auto;
 }
 
+.article-boot-pending .topbar-main,
+.article-boot-pending .topbar-actions span,
+.article-boot-pending .toc-body,
+.article-boot-pending .reader {
+  visibility: hidden;
+}
+
+.article-boot-pending .reader-scroll::before {
+  content: "正在加载文章...";
+  display: block;
+  max-width: 860px;
+  margin: 42px auto;
+  padding: 0 36px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .reader {
   max-width: 860px;
   margin: 0 auto;

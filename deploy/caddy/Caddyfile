@@ -34,7 +34,7 @@
 
 	handle /p/* {
 		header Cache-Control "public, max-age=60, stale-while-revalidate=600"
-		try_files {path} {path}/index.html {path}/ /index.html
+		try_files {path} {path}/index.html {path}/ /reader-shell/index.html
 		file_server
 	}
 

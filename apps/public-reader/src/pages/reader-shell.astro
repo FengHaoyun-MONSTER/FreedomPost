@@ -1,0 +1,17 @@
+---
+import ReaderShell from "../layouts/ReaderShell.astro";
+
+const shellArticle = {
+  slug: "__loading__",
+  title: "正在加载文章",
+  createdAt: new Date(0).toISOString(),
+  updatedAt: new Date(0).toISOString(),
+  viewCount: 0,
+  commentCount: 0,
+  excerpt: "",
+  html: "",
+  toc: []
+};
+---
+
+<ReaderShell article={shellArticle} />
