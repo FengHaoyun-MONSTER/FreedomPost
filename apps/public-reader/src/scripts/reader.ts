@@ -52,7 +52,7 @@ type StoredCommentAttachment = {
   size?: number;
   sizeBytes?: number;
   url?: string;
-  storageProvider?: "local" | "oss";
+  storageProvider?: "local" | "oss" | "r2";
   storageKey?: string;
   storedFilename?: string;
   sha256?: string;

@@ -518,7 +518,7 @@ function normalizeCommentAttachments(value: unknown): Comment["attachments"] {
         mimeType,
         sizeBytes,
         url,
-        ...(source.storageProvider === "local" || source.storageProvider === "oss"
+        ...(isStorageProvider(source.storageProvider)
           ? { storageProvider: source.storageProvider }
           : {}),
         ...(source.storageKey ? { storageKey: String(source.storageKey).slice(0, 1024) } : {}),
@@ -538,4 +538,8 @@ function isSafeAttachmentUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+function isStorageProvider(value: unknown): value is "local" | "oss" | "r2" {
+  return value === "local" || value === "oss" || value === "r2";
 }

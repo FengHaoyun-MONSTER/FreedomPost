@@ -334,15 +334,31 @@ function mapCommentAttachmentRow(row: AttachmentRow): Comment["attachments"][num
     url: row.publicUrl,
     storageKey: row.storageKey,
     storedFilename: row.storedFilename,
-    ...(row.storageProvider === "local" || row.storageProvider === "oss" ? { storageProvider: row.storageProvider } : {}),
+    ...(isStorageProvider(row.storageProvider) ? { storageProvider: row.storageProvider } : {}),
     ...(row.sha256 ? { sha256: row.sha256 } : {})
   };
 }
 
-function inferStorageProvider(url: string): "local" | "oss" {
-  return url.startsWith("/") ? "local" : "oss";
+function inferStorageProvider(url: string): "local" | "oss" | "r2" {
+  if (url.startsWith("/")) return "local";
+
+  try {
+    const parsed = new URL(url);
+    const r2BaseUrl = process.env.R2_PUBLIC_BASE_URL;
+    if (r2BaseUrl && parsed.origin === new URL(r2BaseUrl).origin) {
+      return "r2";
+    }
+  } catch {
+    // Ignore malformed URLs and keep the legacy external fallback.
+  }
+
+  return "oss";
 }
 
 function shaFromAttachmentId(id: string): string | null {
   return /^[a-f0-9]{64}$/i.test(id) ? id : null;
+}
+
+function isStorageProvider(value: string): value is "local" | "oss" | "r2" {
+  return value === "local" || value === "oss" || value === "r2";
 }

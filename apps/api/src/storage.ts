@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import path from "node:path";
 import {
   AliyunOssStorageAdapter,
+  CloudflareR2StorageAdapter,
   LocalStorageAdapter,
   type StorageAdapter
 } from "@freedompost/storage";
@@ -27,15 +28,41 @@ export function createStorageAdapter(): StorageAdapter {
     });
   }
 
+  if (process.env.STORAGE_DRIVER === "r2") {
+    const accountId = requiredEnv("R2_ACCOUNT_ID", "r2");
+    const bucket = process.env.R2_BUCKET ?? "freedompost";
+    const accessKeyId = requiredEnv("R2_ACCESS_KEY_ID", "r2");
+    const secretAccessKey = requiredAnyEnv(["R2_SECRET_ACCESS_KEY", "R2_ACCESS_KEY_SECRET"]);
+
+    return new CloudflareR2StorageAdapter({
+      accountId,
+      bucket,
+      accessKeyId,
+      secretAccessKey,
+      ...(process.env.R2_ENDPOINT ? { endpoint: process.env.R2_ENDPOINT } : {}),
+      publicBaseUrl: process.env.R2_PUBLIC_BASE_URL ?? "https://r2pic.openal.uk",
+      prefix: process.env.R2_PREFIX ?? "freedompost/uploads"
+    });
+  }
+
   return new LocalStorageAdapter(localStorageRoot(), process.env.PUBLIC_UPLOAD_BASE_URL ?? "/api/uploads");
 }
 
-function requiredEnv(name: string): string {
+function requiredEnv(name: string, driver = "oss"): string {
   const value = process.env[name];
   if (!value) {
-    throw new Error(`${name} is required when STORAGE_DRIVER=oss`);
+    throw new Error(`${name} is required when STORAGE_DRIVER=${driver}`);
   }
   return value;
+}
+
+function requiredAnyEnv(names: string[]): string {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) return value;
+  }
+
+  throw new Error(`${names.join(" or ")} is required when STORAGE_DRIVER=r2`);
 }
 
 export function localStorageRoot(): string {

@@ -17,6 +17,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1079.0",
     "@freedompost/security": "0.1.0",
     "ali-oss": "latest"
   }

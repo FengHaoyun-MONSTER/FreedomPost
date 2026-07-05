@@ -40,7 +40,7 @@ type UploadedFile = {
   mimeType: string;
   sizeBytes: number;
   url: string;
-  storageProvider: "local" | "oss";
+  storageProvider: "local" | "oss" | "r2";
   storageKey: string;
 };
 

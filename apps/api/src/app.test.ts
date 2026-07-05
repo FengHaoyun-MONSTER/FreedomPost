@@ -112,19 +112,27 @@ describe("api app", () => {
 
   it("extracts managed OSS asset keys without touching external links", () => {
     const previousBaseUrl = process.env.ALIYUN_OSS_PUBLIC_BASE_URL;
+    const previousR2BaseUrl = process.env.R2_PUBLIC_BASE_URL;
     const previousPrefix = process.env.ALIYUN_OSS_PREFIX;
+    const previousR2Prefix = process.env.R2_PREFIX;
     process.env.ALIYUN_OSS_PUBLIC_BASE_URL = "https://pic.openal.uk";
+    process.env.R2_PUBLIC_BASE_URL = "https://r2pic.openal.uk";
     process.env.ALIYUN_OSS_PREFIX = "freedompost/uploads";
+    process.env.R2_PREFIX = "freedompost/uploads";
 
     try {
       expect(
         [...extractManagedStorageKeys(
           [
             "![managed](https://pic.openal.uk/freedompost/uploads/admin/2026/07/05/a.png)",
+            "![r2](https://r2pic.openal.uk/freedompost/uploads/comments/2026/07/05/c.png)",
             "![external](https://example.com/freedompost/uploads/admin/2026/07/05/b.png)"
           ].join("\n\n")
         )]
-      ).toEqual(["freedompost/uploads/admin/2026/07/05/a.png"]);
+      ).toEqual([
+        "freedompost/uploads/admin/2026/07/05/a.png",
+        "freedompost/uploads/comments/2026/07/05/c.png"
+      ]);
     } finally {
       if (previousBaseUrl === undefined) {
         delete process.env.ALIYUN_OSS_PUBLIC_BASE_URL;
@@ -132,10 +140,22 @@ describe("api app", () => {
         process.env.ALIYUN_OSS_PUBLIC_BASE_URL = previousBaseUrl;
       }
 
+      if (previousR2BaseUrl === undefined) {
+        delete process.env.R2_PUBLIC_BASE_URL;
+      } else {
+        process.env.R2_PUBLIC_BASE_URL = previousR2BaseUrl;
+      }
+
       if (previousPrefix === undefined) {
         delete process.env.ALIYUN_OSS_PREFIX;
       } else {
         process.env.ALIYUN_OSS_PREFIX = previousPrefix;
+      }
+
+      if (previousR2Prefix === undefined) {
+        delete process.env.R2_PREFIX;
+      } else {
+        process.env.R2_PREFIX = previousR2Prefix;
       }
     }
   });

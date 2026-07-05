@@ -88,8 +88,8 @@ export function managedStorageKeyFromUrl(rawUrl: string): string | null {
     if (key && isManagedStorageKey(key)) return key;
   }
 
-  const publicBaseUrl = process.env.ALIYUN_OSS_PUBLIC_BASE_URL;
-  if (publicBaseUrl) {
+  for (const publicBaseUrl of [process.env.ALIYUN_OSS_PUBLIC_BASE_URL, process.env.R2_PUBLIC_BASE_URL]) {
+    if (!publicBaseUrl) continue;
     const key = storageKeyFromPublicBaseUrl(parsed, publicBaseUrl);
     if (key && isManagedStorageKey(key)) return key;
   }
@@ -218,11 +218,16 @@ function normalizeStorageKey(value: string | null | undefined): string | null {
 function isManagedStorageKey(key: string | null): key is string {
   if (!key) return false;
 
-  const ossPrefix = (process.env.ALIYUN_OSS_PREFIX ?? "freedompost/uploads").replace(/^\/+|\/+$/g, "");
+  const storagePrefixes = new Set([
+    (process.env.ALIYUN_OSS_PREFIX ?? "freedompost/uploads").replace(/^\/+|\/+$/g, ""),
+    (process.env.R2_PREFIX ?? "freedompost/uploads").replace(/^\/+|\/+$/g, "")
+  ]);
   const allowedPrefixes = ["admin/", "comments/"];
 
-  if (ossPrefix) {
-    allowedPrefixes.push(`${ossPrefix}/admin/`, `${ossPrefix}/comments/`);
+  for (const prefix of storagePrefixes) {
+    if (prefix) {
+      allowedPrefixes.push(`${prefix}/admin/`, `${prefix}/comments/`);
+    }
   }
 
   return allowedPrefixes.some((prefix) => key.startsWith(prefix));

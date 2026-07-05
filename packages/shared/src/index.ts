@@ -46,7 +46,7 @@ export interface Attachment {
   ownerId?: string;
   originalFilename: string;
   storedFilename: string;
-  storageProvider: "local" | "oss";
+  storageProvider: "local" | "oss" | "r2";
   storageKey: string;
   publicUrl: string;
   mimeType: string;
@@ -64,7 +64,7 @@ export interface CommentAttachment {
   mimeType: string;
   sizeBytes: number;
   url: string;
-  storageProvider?: "local" | "oss";
+  storageProvider?: "local" | "oss" | "r2";
   storageKey?: string;
   storedFilename?: string;
   sha256?: string;

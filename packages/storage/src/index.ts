@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import OSS from "ali-oss";
 import { fileExtension, isAllowedUpload, sha256 } from "@freedompost/security";
+
+export type StorageProvider = "local" | "oss" | "r2";
 
 export interface PutObjectInput {
   buffer: Buffer;
@@ -12,7 +15,7 @@ export interface PutObjectInput {
 }
 
 export interface StoredObject {
-  storageProvider: "local" | "oss";
+  storageProvider: StorageProvider;
   storageKey: string;
   publicUrl: string;
   storedFilename: string;
@@ -104,6 +107,16 @@ export interface AliyunOssStorageOptions {
   prefix?: string;
 }
 
+export interface CloudflareR2StorageOptions {
+  accountId: string;
+  bucket: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  endpoint?: string;
+  publicBaseUrl?: string;
+  prefix?: string;
+}
+
 export class AliyunOssStorageAdapter implements StorageAdapter {
   private readonly client: OSS;
 
@@ -166,6 +179,83 @@ export class AliyunOssStorageAdapter implements StorageAdapter {
     }
 
     return `https://${this.options.bucket}.${this.options.region}.aliyuncs.com/${key
+      .split("/")
+      .map(encodeURIComponent)
+      .join("/")}`;
+  }
+}
+
+export class CloudflareR2StorageAdapter implements StorageAdapter {
+  private readonly client: S3Client;
+
+  constructor(private readonly options: CloudflareR2StorageOptions) {
+    this.client = new S3Client({
+      region: "auto",
+      endpoint: options.endpoint ?? `https://${options.accountId}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: options.accessKeyId,
+        secretAccessKey: options.secretAccessKey
+      }
+    });
+  }
+
+  async putObject(input: PutObjectInput): Promise<StoredObject> {
+    if (!isAllowedUpload(input.originalFilename, input.mimeType)) {
+      throw new UploadRejectedError("Unsupported upload type");
+    }
+
+    const now = new Date();
+    const extension = fileExtension(input.originalFilename);
+    const storedFilename = `${randomUUID()}.${extension}`;
+    const namespace = input.namespace ?? "general";
+    const key = [
+      this.options.prefix?.replace(/^\/|\/$/g, ""),
+      namespace,
+      String(now.getUTCFullYear()),
+      String(now.getUTCMonth() + 1).padStart(2, "0"),
+      String(now.getUTCDate()).padStart(2, "0"),
+      storedFilename
+    ]
+      .filter(Boolean)
+      .join("/");
+
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.options.bucket,
+        Key: key,
+        Body: input.buffer,
+        ContentType: input.mimeType,
+        ContentDisposition: contentDisposition(input.originalFilename, input.mimeType)
+      })
+    );
+
+    return {
+      storageProvider: "r2",
+      storageKey: key,
+      publicUrl: this.getPublicUrl(key),
+      storedFilename,
+      originalFilename: input.originalFilename,
+      mimeType: input.mimeType,
+      sizeBytes: input.buffer.byteLength,
+      sha256: sha256(input.buffer)
+    };
+  }
+
+  async deleteObject(key: string): Promise<void> {
+    await this.client.send(
+      new DeleteObjectCommand({
+        Bucket: this.options.bucket,
+        Key: key
+      })
+    );
+  }
+
+  getPublicUrl(key: string): string {
+    if (this.options.publicBaseUrl) {
+      return `${this.options.publicBaseUrl.replace(/\/$/, "")}/${key.split("/").map(encodeURIComponent).join("/")}`;
+    }
+
+    return `https://${this.options.bucket}.${this.options.accountId}.r2.cloudflarestorage.com/${key
       .split("/")
       .map(encodeURIComponent)
       .join("/")}`;
