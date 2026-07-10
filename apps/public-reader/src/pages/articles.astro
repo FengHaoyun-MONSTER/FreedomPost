@@ -1,0 +1,10 @@
+---
+import ReaderShell from "../layouts/ReaderShell.astro";
+import { latestArticle } from "../lib/articles";
+
+if (!latestArticle) {
+  throw new Error("No seed articles configured");
+}
+---
+
+<ReaderShell article={latestArticle} />

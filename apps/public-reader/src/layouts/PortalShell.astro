@@ -1,0 +1,109 @@
+---
+import "../styles/portal.css";
+
+interface Props {
+  activePage: "home" | "topics" | "market" | "guide" | "about";
+  title: string;
+  description: string;
+}
+
+const { activePage, title, description } = Astro.props;
+const siteName = "FreedomPost";
+const pageTitle = activePage === "home" ? siteName : `${title} - ${siteName}`;
+const canonicalUrl = new URL(Astro.url.pathname, Astro.site ?? "https://example.com").toString();
+const navItems = [
+  { id: "home", href: "/", label: "首页" },
+  { id: "articles", href: "/articles/", label: "文章" },
+  { id: "topics", href: "/topics/", label: "专题" },
+  { id: "market", href: "/market/", label: "商城" },
+  { id: "guide", href: "/guide/", label: "使用指南" },
+  { id: "about", href: "/about/", label: "关于" }
+] as const;
+---
+
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+    <meta property="og:site_name" content={siteName} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={new URL("/images/freedompost-editorial-hero.webp", canonicalUrl).toString()} />
+    <meta name="theme-color" content="#151714" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body data-page={activePage}>
+    <header class="site-header">
+      <div class="site-header-inner">
+        <a class="portal-brand" href="/" aria-label="FreedomPost 首页">
+          <span class="portal-brand-mark">F</span>
+          <span class="portal-brand-copy">
+            <strong>FreedomPost</strong>
+            <small>自由发布</small>
+          </span>
+        </a>
+
+        <button id="navToggle" class="portal-icon-button nav-toggle" type="button" aria-label="打开导航" aria-expanded="false">
+          <i data-lucide="menu"></i>
+        </button>
+
+        <nav id="primaryNav" class="primary-nav" aria-label="主导航">
+          {
+            navItems.map((item) => (
+              <a class:list={["nav-link", { active: activePage === item.id }]} href={item.href} aria-current={activePage === item.id ? "page" : undefined}>
+                {item.label}
+              </a>
+            ))
+          }
+        </nav>
+
+        <div class="header-actions">
+          <span id="servicePulse" class="service-pulse" data-status="checking">
+            <span></span>
+            <b>服务检测中</b>
+          </span>
+          <button id="portalThemeBtn" class="portal-icon-button" type="button" aria-label="切换主题" title="切换主题">
+            <i data-lucide="sun"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="service-strip" aria-label="站点状态">
+      <div class="service-strip-inner">
+        <span><i data-lucide="radio"></i> FreedomPost 正常运行</span>
+        <span>文章、评论与附件由同一发布链路提供</span>
+      </div>
+    </div>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="portal-footer">
+      <div class="portal-footer-inner">
+        <a class="portal-brand footer-brand" href="/">
+          <span class="portal-brand-mark">F</span>
+          <span class="portal-brand-copy"><strong>FreedomPost</strong><small>让内容先被看见</small></span>
+        </a>
+        <p>一个专注写作、发布与阅读的独立内容空间。</p>
+        <nav aria-label="页脚导航">
+          <a href="/articles/">全部文章</a>
+          <a href="/guide/">使用指南</a>
+          <a href="/about/">关于本站</a>
+        </nav>
+      </div>
+    </footer>
+
+    <div id="portalToast" class="portal-toast" role="status" aria-live="polite"></div>
+    <script>
+      import "../scripts/portal.ts";
+    </script>
+  </body>
+</html>

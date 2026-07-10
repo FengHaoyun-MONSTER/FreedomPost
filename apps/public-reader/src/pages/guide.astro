@@ -1,0 +1,24 @@
+---
+import PortalShell from "../layouts/PortalShell.astro";
+---
+
+<PortalShell activePage="guide" title="使用指南" description="了解如何阅读、分享、评论和管理 FreedomPost 内容。">
+  <header class="page-hero portal-container">
+    <p class="eyebrow"><span></span> Guide</p>
+    <div class="page-hero-row"><div><h1>使用指南</h1><p>不需要学习复杂规则，沿着内容自然使用即可。</p></div></div>
+  </header>
+  <section class="portal-section guide-section">
+    <div class="portal-container guide-layout">
+      <aside class="guide-index" aria-label="指南目录">
+        <strong>指南目录</strong>
+        <a href="#read">阅读文章</a><a href="#find">查找内容</a><a href="#comment">评论与文件</a><a href="#publish">发布内容</a>
+      </aside>
+      <div class="guide-content">
+        <article id="read"><span class="guide-number">01</span><div><p class="section-kicker">Read</p><h2>阅读文章</h2><p>从首页或文章广场选择内容后，会进入专注阅读页。桌面端左侧是文章列表，中间是目录，右侧是正文；点击目录可以快速定位章节。</p><ul><li>文章内部链接会在新标签页打开</li><li>复制链接可直接分享当前文章</li><li>图片、视频与附件会按内容类型展示</li></ul></div></article>
+        <article id="find"><span class="guide-number">02</span><div><p class="section-kicker">Find</p><h2>查找内容</h2><p>文章广场的搜索同时匹配标题和正文。进入阅读页后，也可以使用左侧搜索框在全部文章中切换。</p></div></article>
+        <article id="comment"><span class="guide-number">03</span><div><p class="section-kicker">Discuss</p><h2>评论与文件</h2><p>评论支持文字、粘贴剪贴板图片，以及把图片或文件直接拖入输入区。没有内容时发布按钮不可点击，上传完成后附件会跟随评论展示。</p></div></article>
+        <article id="publish"><span class="guide-number">04</span><div><p class="section-kicker">Publish</p><h2>发布内容</h2><p>管理员在独立后台完成编辑。文章保存后立即进入公开列表；被文章移除的图片与附件会在保存时完成引用判断，避免误删仍在使用的文件。公开页面不展示管理入口。</p></div></article>
+      </div>
+    </div>
+  </section>
+</PortalShell>

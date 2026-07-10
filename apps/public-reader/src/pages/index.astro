@@ -1,10 +1,91 @@
 ---
-import ReaderShell from "../layouts/ReaderShell.astro";
-import { latestArticle } from "../lib/articles";
+import PortalShell from "../layouts/PortalShell.astro";
+import { articles, toPostListItem } from "../lib/articles";
 
-if (!latestArticle) {
-  throw new Error("No seed articles configured");
-}
+const initialPosts = articles.slice(0, 4).map(toPostListItem);
+const latest = initialPosts[0];
+const formatDate = (value: string) => new Intl.DateTimeFormat("zh-CN", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit"
+}).format(new Date(value));
 ---
 
-<ReaderShell article={latestArticle} />
+<PortalShell
+  activePage="home"
+  title="FreedomPost"
+  description="FreedomPost 是一个专注写作、发布与阅读的独立内容空间。"
+>
+  <section class="portal-hero" aria-labelledby="heroTitle">
+    <div class="hero-media" aria-hidden="true"></div>
+    <div class="hero-content portal-container">
+      <p class="eyebrow"><span></span> 独立发布 · 长文阅读 · 开放讨论</p>
+      <h1 id="heroTitle">把想说的话，<br />完整地留下来。</h1>
+      <p class="hero-lead">FreedomPost 让写作回到内容本身。没有信息流噪声，没有复杂门槛，文章、资料与讨论都在一处安静展开。</p>
+      <div class="hero-actions">
+        <a id="latestArticleLink" class="button primary" href={latest ? `/p/${encodeURIComponent(latest.slug)}` : "/articles/"}>
+          <i data-lucide="book-open"></i><span>开始阅读</span>
+        </a>
+        <a class="button secondary" href="/articles/"><i data-lucide="library"></i><span>浏览全部文章</span></a>
+      </div>
+      <dl class="hero-stats" aria-label="站点统计">
+        <div><dt id="heroPostCount">{initialPosts.length}</dt><dd>篇内容</dd></div>
+        <div><dt id="heroViewCount">{initialPosts.reduce((sum, post) => sum + post.viewCount, 0)}</dt><dd>次阅读</dd></div>
+        <div><dt id="heroCommentCount">{initialPosts.reduce((sum, post) => sum + post.commentCount, 0)}</dt><dd>条讨论</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="portal-section latest-section" aria-labelledby="latestHeading">
+    <div class="portal-container">
+      <div class="section-head">
+        <div><p class="section-kicker">Latest writing</p><h2 id="latestHeading">最近发布</h2></div>
+        <a class="text-link" href="/articles/">查看全部 <i data-lucide="arrow-right"></i></a>
+      </div>
+      <div id="portalPostGrid" class="post-card-grid" data-limit="4">
+        {
+          initialPosts.map((post, index) => (
+            <article class:list={["post-card", { featured: index === 0 }]}>
+              <a href={`/p/${encodeURIComponent(post.slug)}`} aria-label={`阅读 ${post.title}`}>
+                <div class="post-card-topline"><span>{index === 0 ? "最新文章" : "文章"}</span><time datetime={post.createdAt}>{formatDate(post.createdAt)}</time></div>
+                <h3>{post.title}</h3>
+                <p>{post.excerpt || "打开文章，继续阅读完整内容。"}</p>
+                <div class="post-card-meta"><span>{post.viewCount} 阅读</span><span>{post.commentCount} 评论</span><i data-lucide="arrow-up-right"></i></div>
+              </a>
+            </article>
+          ))
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="portal-section route-section" aria-labelledby="routesHeading">
+    <div class="portal-container route-layout">
+      <div class="route-intro">
+        <p class="section-kicker">Explore FreedomPost</p>
+        <h2 id="routesHeading">从你关心的内容开始</h2>
+        <p>参考新原型的入口式布局，把阅读、查找和了解本站拆成清晰路径。每个入口都有明确去处，不让访客在首页绕路。</p>
+      </div>
+      <div class="route-list">
+        <a href="/articles/"><span class="route-icon"><i data-lucide="newspaper"></i></span><span><strong>文章广场</strong><small>按标题和正文搜索全部内容</small></span><i data-lucide="chevron-right"></i></a>
+        <a href="/topics/"><span class="route-icon amber"><i data-lucide="shapes"></i></span><span><strong>专题导航</strong><small>从技术、产品和随笔进入阅读</small></span><i data-lucide="chevron-right"></i></a>
+        <a href="/guide/"><span class="route-icon blue"><i data-lucide="route"></i></span><span><strong>使用指南</strong><small>发布、分享、评论和附件说明</small></span><i data-lucide="chevron-right"></i></a>
+        <a href="/about/"><span class="route-icon neutral"><i data-lucide="info"></i></span><span><strong>关于 FreedomPost</strong><small>设计原则、服务边界与联系方式</small></span><i data-lucide="chevron-right"></i></a>
+      </div>
+    </div>
+  </section>
+
+  <section class="portal-section manifesto-section" aria-labelledby="manifestoHeading">
+    <div class="portal-container manifesto-layout">
+      <div>
+        <p class="section-kicker">Publishing flow</p>
+        <h2 id="manifestoHeading">写作、发布、阅读，一条完整链路</h2>
+      </div>
+      <ol class="process-list">
+        <li><span>01</span><div><strong>在后台完成内容</strong><p>标题、层级、颜色、图片和附件都在同一编辑器中处理。</p></div></li>
+        <li><span>02</span><div><strong>保存即对外发布</strong><p>正文与文件进入统一存储，文章地址保持稳定，可直接分享。</p></div></li>
+        <li><span>03</span><div><strong>围绕内容继续讨论</strong><p>访客可以匿名评论，粘贴图片或拖入文件，讨论留在文章下方。</p></div></li>
+      </ol>
+    </div>
+  </section>
+</PortalShell>

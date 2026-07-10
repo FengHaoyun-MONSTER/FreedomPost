@@ -1,0 +1,18 @@
+---
+import PortalShell from "../layouts/PortalShell.astro";
+---
+
+<PortalShell activePage="topics" title="专题" description="从不同主题进入 FreedomPost 的内容。">
+  <header class="page-hero portal-container">
+    <p class="eyebrow"><span></span> Topics</p>
+    <div class="page-hero-row"><div><h1>专题导航</h1><p>内容仍然属于文章，专题只是更自然的阅读入口。</p></div></div>
+  </header>
+  <section class="portal-section topic-section">
+    <div class="portal-container topic-grid">
+      <a class="topic-card topic-reading" href="/articles/"><span>01</span><i data-lucide="book-open-text"></i><h2>阅读与写作</h2><p>进入 FreedomPost 阅读器，通过左侧搜索定位相关内容。</p><em>进入文章 <i data-lucide="arrow-right"></i></em></a>
+      <a class="topic-card topic-engineering" href="/articles/"><span>02</span><i data-lucide="braces"></i><h2>工程与架构</h2><p>系统设计、代码实践、部署记录与技术决策。</p><em>进入文章 <i data-lucide="arrow-right"></i></em></a>
+      <a class="topic-card topic-product" href="/articles/"><span>03</span><i data-lucide="panels-top-left"></i><h2>产品与体验</h2><p>界面、交互、需求推演，以及产品背后的取舍。</p><em>进入文章 <i data-lucide="arrow-right"></i></em></a>
+      <a class="topic-card topic-notes" href="/articles/"><span>04</span><i data-lucide="notebook-pen"></i><h2>日常笔记</h2><p>尚未归类的观察、资料、备忘与阶段性思考。</p><em>进入文章 <i data-lucide="arrow-right"></i></em></a>
+    </div>
+  </section>
+</PortalShell>

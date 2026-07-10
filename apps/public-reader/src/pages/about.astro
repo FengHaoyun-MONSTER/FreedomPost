@@ -1,0 +1,24 @@
+---
+import PortalShell from "../layouts/PortalShell.astro";
+---
+
+<PortalShell activePage="about" title="关于" description="了解 FreedomPost 的设计目标与服务边界。">
+  <header class="page-hero portal-container">
+    <p class="eyebrow"><span></span> About</p>
+    <div class="page-hero-row"><div><h1>关于 FreedomPost</h1><p>一个从真实写作需求里长出来的发布系统。</p></div></div>
+  </header>
+  <section class="portal-section about-section">
+    <div class="portal-container about-lead">
+      <p>FreedomPost 不试图成为又一个喧闹的信息流。它更接近一张长期使用的书桌：作者可以认真完成一篇内容，读者可以安静读完，也可以围绕文章留下文字与文件。</p>
+    </div>
+    <div class="portal-container principle-grid">
+      <article><span>01</span><i data-lucide="focus"></i><h2>内容优先</h2><p>标题、目录、正文和评论构成阅读主线，其它界面只负责帮助抵达内容。</p></article>
+      <article><span>02</span><i data-lucide="link-2"></i><h2>地址稳定</h2><p>每篇文章拥有独立链接。保存、部署与存储方式变化，不应破坏分享地址。</p></article>
+      <article><span>03</span><i data-lucide="shield-check"></i><h2>开放但有边界</h2><p>评论允许匿名与附件，同时通过类型、大小和响应头保护阅读页面。</p></article>
+    </div>
+    <div class="portal-container service-note">
+      <div><p class="section-kicker">Service status</p><h2>当前服务范围</h2></div>
+      <dl><div><dt>公开阅读</dt><dd>正常</dd></div><div><dt>评论与附件</dt><dd>正常</dd></div><div><dt>后台发布</dt><dd>管理员可用</dd></div><div><dt>文件存储</dt><dd>Cloudflare R2</dd></div></dl>
+    </div>
+  </section>
+</PortalShell>

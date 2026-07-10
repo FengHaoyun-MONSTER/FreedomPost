@@ -5,7 +5,12 @@ export const GET: APIRoute = ({ site }) => {
   const origin = site?.toString().replace(/\/$/, "") ?? "https://example.com";
   const urls = [
     `${origin}/`,
-    ...articles.map((article) => `${origin}/p/${article.slug}`)
+    `${origin}/articles/`,
+    `${origin}/topics/`,
+    `${origin}/market/`,
+    `${origin}/guide/`,
+    `${origin}/about/`,
+    ...articles.map((article) => `${origin}/p/${encodeURIComponent(article.slug)}`)
   ];
 
   const body = `<?xml version="1.0" encoding="UTF-8"?>
