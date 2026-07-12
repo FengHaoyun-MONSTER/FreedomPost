@@ -25,7 +25,8 @@ import {
   type AffiliateCommissionStatus,
   type AffiliateOrderStatus,
   type ContentRepository,
-  type ProductInput
+  type ProductInput,
+  type ToolInput
 } from "./repositories/index.js";
 import { createStorageAdapter, getLocalUploadStream } from "./storage.js";
 
@@ -92,6 +93,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     }
     return { item: product };
   });
+
+  app.get("/api/tools", async () => ({
+    items: await repository.listTools({ publishedOnly: true })
+  }));
 
   app.post<{ Body: unknown }>("/api/affiliate/access", async (request, reply) => {
     if (!allowRequest(`affiliate-access:${request.ip}`, 12, 60_000)) {
@@ -434,6 +439,42 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     return { items: await repository.listProducts() };
   });
 
+  app.get("/api/admin/tools", async (request, reply) => {
+    if (!getSession(request.cookies.fp_session)) return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
+    return { items: await repository.listTools() };
+  });
+
+  app.post<{ Body: unknown }>("/api/admin/tools", async (request, reply) => {
+    if (!getSession(request.cookies.fp_session)) return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
+    const input = normalizeToolInput(request.body);
+    if (!input) return reply.code(400).send(errorBody("INVALID_TOOL", "工具信息不完整或格式不正确"));
+    return reply.code(201).send(await repository.createTool(input));
+  });
+
+  app.put<{ Params: { id: string }; Body: unknown }>("/api/admin/tools/:id", async (request, reply) => {
+    if (!getSession(request.cookies.fp_session)) return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
+    const input = normalizeToolInput(request.body);
+    if (!input) return reply.code(400).send(errorBody("INVALID_TOOL", "工具信息不完整或格式不正确"));
+    const existing = await repository.getToolById(request.params.id);
+    if (!existing) return reply.code(404).send(errorBody("TOOL_NOT_FOUND", "工具不存在"));
+    const removedCoverKey = existing.coverUrl !== input.coverUrl && existing.coverUrl ? managedStorageKeyFromUrl(existing.coverUrl) : null;
+    const updated = await repository.updateTool(request.params.id, input);
+    if (!updated) return reply.code(404).send(errorBody("TOOL_NOT_FOUND", "工具不存在"));
+    if (removedCoverKey) await deleteUnreferencedManagedAssets({ candidateKeys: [removedCoverKey], repository, storage }).catch((error) => request.log.warn({ error }, "Removed tool cover cleanup failed"));
+    return updated;
+  });
+
+  app.delete<{ Params: { id: string } }>("/api/admin/tools/:id", async (request, reply) => {
+    if (!getSession(request.cookies.fp_session)) return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
+    const existing = await repository.getToolById(request.params.id);
+    if (!existing) return reply.code(404).send(errorBody("TOOL_NOT_FOUND", "工具不存在"));
+    const deleted = await repository.deleteTool(request.params.id);
+    if (!deleted) return reply.code(404).send(errorBody("TOOL_NOT_FOUND", "工具不存在"));
+    const coverKey = existing.coverUrl ? managedStorageKeyFromUrl(existing.coverUrl) : null;
+    if (coverKey) await deleteUnreferencedManagedAssets({ candidateKeys: [coverKey], repository, storage }).catch((error) => request.log.warn({ error }, "Deleted tool cover cleanup failed"));
+    return { ok: true };
+  });
+
   app.get("/api/admin/affiliates", async (request, reply) => {
     if (!getSession(request.cookies.fp_session)) return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
     return { items: await repository.listAffiliates() };
@@ -687,6 +728,21 @@ function normalizeProductInput(value: unknown): ProductInput | null {
   return { title, summary, description, category, priceCents, commissionCents, compareAtCents, currency, stock, soldCount, coverUrl, status, sortOrder };
 }
 
+function normalizeToolInput(value: unknown): ToolInput | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Record<string, unknown>;
+  const title = readText(input.title, 120);
+  const summary = readText(input.summary, 500);
+  const description = readText(input.description, 12_000);
+  const category = readText(input.category, 32) || "other";
+  const url = readRequiredUrl(input.url);
+  const coverUrl = readOptionalUrl(input.coverUrl);
+  const status = input.status === "published" ? "published" : input.status === "draft" ? "draft" : null;
+  const sortOrder = readInteger(input.sortOrder, -100_000, 100_000);
+  if (!title || !summary || !description || !url || !status || sortOrder === null) return null;
+  return { title, summary, description, category, url, coverUrl, status, sortOrder };
+}
+
 function getAffiliateSession(token: string | undefined) {
   if (!token) return null;
   return affiliateSessions.get(sha256(token)) ?? null;
@@ -742,6 +798,17 @@ function readOptionalUrl(value: unknown): string | null {
   try {
     const url = new URL(value, "http://freedompost.local");
     return url.protocol === "http:" || url.protocol === "https:" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function readRequiredUrl(value: unknown): string | null {
+  const url = readOptionalUrl(value);
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? url : null;
   } catch {
     return null;
   }

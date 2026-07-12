@@ -34,6 +34,18 @@ type StoreProduct = {
   status: "published";
 };
 
+type CreatorTool = {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  description: string;
+  category: string;
+  url: string;
+  coverUrl: string | null;
+  status: "published";
+};
+
 type AffiliateOrder = {
   id: string;
   orderCode: string;
@@ -131,6 +143,7 @@ function bindPageInteractions() {
 
   if (postGrid) void hydratePosts();
   void hydrateMarket();
+  void hydrateTools();
   void hydrateAffiliateDashboard();
   propagateReferralLinks();
 }
@@ -317,6 +330,64 @@ async function hydrateMarket() {
   } catch {
     count.textContent = "商品加载失败";
     empty.hidden = false;
+  }
+}
+
+async function hydrateTools() {
+  const grid = document.querySelector<HTMLElement>("#toolsGrid");
+  const filters = document.querySelector<HTMLElement>("#toolsCategoryFilters");
+  const count = document.querySelector<HTMLElement>("#toolsCount");
+  const empty = document.querySelector<HTMLElement>("#toolsEmpty");
+  if (!grid || !filters || !count || !empty) return;
+  let tools: CreatorTool[] = [];
+  let category = "all";
+  const render = () => {
+    const visible = tools.filter((tool) => category === "all" || tool.category === category);
+    grid.innerHTML = visible.map(renderToolCard).join("");
+    count.textContent = `${visible.length} 个工具`;
+    empty.hidden = visible.length > 0;
+    grid.querySelectorAll<HTMLButtonElement>("[data-share-tool]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const tool = tools.find((item) => item.slug === button.dataset.shareTool);
+        if (tool) void shareTool(tool);
+      });
+    });
+    createPortalIcons();
+  };
+  filters.querySelectorAll<HTMLButtonElement>("[data-tool-category]").forEach((button) => {
+    button.addEventListener("click", () => {
+      category = button.dataset.toolCategory ?? "all";
+      filters.querySelectorAll("button").forEach((item) => item.classList.toggle("active", item === button));
+      render();
+    });
+  });
+  try {
+    const response = await fetch("/api/tools", { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error("tools unavailable");
+    tools = ((await response.json()) as { items: CreatorTool[] }).items;
+    render();
+  } catch {
+    count.textContent = "工具加载失败";
+    empty.hidden = false;
+  }
+}
+
+function renderToolCard(tool: CreatorTool) {
+  const cover = tool.coverUrl
+    ? `<img src="${escapeAttribute(tool.coverUrl)}" alt="${escapeAttribute(tool.title)}" />`
+    : `<span class="tool-card-mark"><i data-lucide="wrench"></i></span>`;
+  return `<article class="tool-card"><div class="tool-card-cover">${cover}</div><div class="tool-card-body"><div class="tool-card-topline"><span>${escapeHtml(toolCategoryLabel(tool.category))}</span><button class="tool-share-button" type="button" data-share-tool="${escapeAttribute(tool.slug)}" aria-label="分享 ${escapeAttribute(tool.title)}" title="分享"><i data-lucide="share-2"></i></button></div><h2>${escapeHtml(tool.title)}</h2><p>${escapeHtml(tool.summary)}</p><div class="tool-card-footer"><a class="button primary" href="${escapeAttribute(tool.url)}" target="_blank" rel="noopener noreferrer">访问工具 <i data-lucide="arrow-up-right"></i></a></div></div></article>`;
+}
+
+async function shareTool(tool: CreatorTool) {
+  const shareData = { title: tool.title, text: tool.summary, url: tool.url };
+  const canShare = typeof navigator.share === "function";
+  try {
+    if (canShare) await navigator.share(shareData);
+    else await navigator.clipboard.writeText(tool.url);
+    showPortalToast(canShare ? "分享面板已打开" : "工具链接已复制");
+  } catch {
+    // A dismissed native share sheet is not an error to show the visitor.
   }
 }
 
@@ -633,6 +704,10 @@ function formatCurrency(cents: number, currency: string) {
 
 function productCategoryLabel(category: string) {
   return ({ service: "服务", digital: "数字内容", software: "软件工具", other: "其它" } as Record<string, string>)[category] ?? "其它";
+}
+
+function toolCategoryLabel(category: string) {
+  return ({ writing: "写作", design: "设计", productivity: "效率", other: "其它" } as Record<string, string>)[category] ?? "其它";
 }
 
 function escapeHtml(value: string) {

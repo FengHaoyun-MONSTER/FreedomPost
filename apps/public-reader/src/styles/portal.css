@@ -894,6 +894,177 @@ svg {
   background: var(--portal-panel-soft);
 }
 
+.tools-section {
+  min-height: calc(100vh - 218px);
+  background: var(--portal-panel-soft);
+}
+
+.tools-page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 30px;
+  padding-bottom: 34px;
+  border-bottom: 1px solid var(--portal-line);
+}
+
+.tools-page-head h1 {
+  margin: 10px 0 8px;
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", STSong, SimSun, serif;
+  font-size: 42px;
+  line-height: 1.25;
+}
+
+.tools-page-head p:last-child {
+  margin: 0;
+  color: var(--portal-muted);
+}
+
+.tools-count {
+  color: var(--portal-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.tools-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding-block: 24px;
+}
+
+.tools-filters button {
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: 8px;
+  background: var(--portal-panel);
+  color: var(--portal-muted);
+  font-size: 13px;
+}
+
+.tools-filters button.active,
+.tools-filters button:hover {
+  border-color: var(--portal-accent);
+  background: var(--portal-accent-soft);
+  color: var(--portal-accent);
+}
+
+.tools-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.tool-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--portal-line);
+  border-radius: 8px;
+  background: var(--portal-panel);
+}
+
+.tool-card:hover {
+  border-color: color-mix(in srgb, var(--portal-accent) 58%, var(--portal-line));
+}
+
+.tool-card-cover {
+  height: 150px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-bottom: 1px solid var(--portal-line);
+  background: var(--portal-bg);
+}
+
+.tool-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tool-card-mark {
+  color: var(--portal-accent);
+}
+
+.tool-card-mark svg {
+  width: 38px;
+  height: 38px;
+}
+
+.tool-card-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 210px;
+  padding: 18px;
+}
+
+.tool-card-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tool-card-topline > span {
+  color: var(--portal-accent);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.tool-share-button {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--portal-muted);
+}
+
+.tool-share-button:hover {
+  border-color: var(--portal-accent);
+  color: var(--portal-accent);
+}
+
+.tool-share-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.tool-card h2 {
+  margin: 15px 0 7px;
+  font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", STSong, SimSun, serif;
+  font-size: 21px;
+  line-height: 1.4;
+}
+
+.tool-card p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: var(--portal-muted);
+  font-size: 14px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.tool-card-footer {
+  margin-top: auto;
+}
+
+.tool-card-footer .button {
+  width: 100%;
+  margin-top: 18px;
+}
+
+.tool-card-footer .button svg {
+  width: 15px;
+  height: 15px;
+}
+
 .market-console {
   display: grid;
   grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1.3fr) auto;
@@ -1850,13 +2021,24 @@ svg {
   .post-card-grid,
   .archive-grid,
   .topic-grid,
-  .market-product-grid {
+  .market-product-grid,
+  .tools-grid {
     grid-template-columns: 1fr;
   }
 
   .market-console {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .tools-page-head {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .tools-page-head h1 {
+    font-size: 34px;
   }
 
   .product-dialog-actions,

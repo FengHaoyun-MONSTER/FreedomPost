@@ -10,6 +10,7 @@ import {
   postViews as postViewsTable,
   posts as postsTable,
   products as productsTable
+  ,tools as toolsTable
 } from "@freedompost/db";
 import type { Comment } from "@freedompost/shared";
 import {
@@ -28,6 +29,8 @@ import type {
   CreateCommentInput,
   CreatePostInput,
   ProductInput,
+  StoredTool,
+  ToolInput,
   RecordViewInput,
   RecordViewResult,
   StoredPost,
@@ -42,6 +45,7 @@ type PostRow = typeof postsTable.$inferSelect;
 type CommentRow = typeof commentsTable.$inferSelect;
 type AttachmentRow = typeof attachmentsTable.$inferSelect;
 type ProductRow = typeof productsTable.$inferSelect;
+type ToolRow = typeof toolsTable.$inferSelect;
 type AffiliateRow = typeof affiliatesTable.$inferSelect;
 
 export class PostgresContentRepository implements ContentRepository {
@@ -352,6 +356,46 @@ export class PostgresContentRepository implements ContentRepository {
     return deleted.length > 0;
   }
 
+  async listTools(options: { publishedOnly?: boolean } = {}): Promise<StoredTool[]> {
+    const query = this.db.select().from(toolsTable);
+    const rows = options.publishedOnly
+      ? await query.where(eq(toolsTable.status, "published"))
+      : await query;
+    return rows
+      .sort((left, right) => right.sortOrder - left.sortOrder || right.createdAt.getTime() - left.createdAt.getTime())
+      .map(mapToolRow);
+  }
+
+  async getToolById(id: string): Promise<StoredTool | null> {
+    const [row] = await this.db.select().from(toolsTable).where(eq(toolsTable.id, id)).limit(1);
+    return row ? mapToolRow(row) : null;
+  }
+
+  async createTool(input: ToolInput): Promise<StoredTool> {
+    const now = new Date();
+    const [row] = await this.db.insert(toolsTable).values({
+      id: crypto.randomUUID(),
+      slug: await this.uniqueToolSlug(input.title),
+      ...input,
+      createdAt: now,
+      updatedAt: now
+    }).returning();
+    if (!row) throw new Error("Failed to insert tool");
+    return mapToolRow(row);
+  }
+
+  async updateTool(id: string, input: ToolInput): Promise<StoredTool | null> {
+    const existing = await this.getToolById(id);
+    if (!existing) return null;
+    const [row] = await this.db.update(toolsTable).set({ ...input, updatedAt: new Date() }).where(eq(toolsTable.id, id)).returning();
+    return row ? mapToolRow(row) : null;
+  }
+
+  async deleteTool(id: string): Promise<boolean> {
+    const rows = await this.db.delete(toolsTable).where(eq(toolsTable.id, id)).returning({ id: toolsTable.id });
+    return rows.length > 0;
+  }
+
   async getAffiliateByWechatId(wechatId: string): Promise<StoredAffiliate | null> {
     const [row] = await this.db.select().from(affiliatesTable).where(eq(affiliatesTable.wechatId, wechatId)).limit(1);
     return row ? mapAffiliateRow(row) : null;
@@ -494,6 +538,16 @@ export class PostgresContentRepository implements ContentRepository {
     }
     return `${base}-${crypto.randomUUID().slice(0, 8)}`;
   }
+
+  private async uniqueToolSlug(title: string): Promise<string> {
+    const base = makeSlug(title || "tool");
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const slug = attempt === 0 ? base : `${base}-${attempt + 1}`;
+      const [existing] = await this.db.select({ id: toolsTable.id }).from(toolsTable).where(eq(toolsTable.slug, slug)).limit(1);
+      if (!existing) return slug;
+    }
+    return `${base}-${crypto.randomUUID().slice(0, 8)}`;
+  }
 }
 
 function mapPostRow(row: PostRow): StoredPost {
@@ -524,6 +578,23 @@ function mapProductRow(row: ProductRow): StoredProduct {
     currency: row.currency,
     stock: row.stock,
     soldCount: row.soldCount,
+    coverUrl: row.coverUrl,
+    status: row.status === "published" ? "published" : "draft",
+    sortOrder: row.sortOrder,
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt)
+  };
+}
+
+function mapToolRow(row: ToolRow): StoredTool {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    summary: row.summary,
+    description: row.description,
+    category: row.category,
+    url: row.url,
     coverUrl: row.coverUrl,
     status: row.status === "published" ? "published" : "draft",
     sortOrder: row.sortOrder,

@@ -1,0 +1,23 @@
+---
+import PortalShell from "../layouts/PortalShell.astro";
+---
+
+<PortalShell activePage="tools" title="博主常用工具" description="FreedomPost 博主常用的网站和工具。">
+  <section class="portal-section tools-section">
+    <div class="portal-container">
+      <header class="tools-page-head">
+        <div><p class="section-kicker">Creator Tools</p><h1>博主常用工具</h1><p>写作、创作和日常工作中，我经常使用的一些工具和网站。</p></div>
+        <span id="toolsCount" class="tools-count">加载中</span>
+      </header>
+      <div id="toolsCategoryFilters" class="tools-filters" role="group" aria-label="工具分类">
+        <button class="active" type="button" data-tool-category="all">全部</button>
+        <button type="button" data-tool-category="writing">写作</button>
+        <button type="button" data-tool-category="design">设计</button>
+        <button type="button" data-tool-category="productivity">效率</button>
+        <button type="button" data-tool-category="other">其它</button>
+      </div>
+      <div id="toolsGrid" class="tools-grid" aria-live="polite"></div>
+      <div id="toolsEmpty" class="empty-state" hidden><i data-lucide="wrench"></i><strong>暂时还没有发布工具</strong><span>工具发布后会出现在这里。</span></div>
+    </div>
+  </section>
+</PortalShell>

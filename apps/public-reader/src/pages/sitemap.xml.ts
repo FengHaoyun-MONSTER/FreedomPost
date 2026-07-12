@@ -6,6 +6,7 @@ export const GET: APIRoute = ({ site }) => {
   const urls = [
     `${origin}/`,
     `${origin}/articles/`,
+    `${origin}/tools/`,
     `${origin}/topics/`,
     `${origin}/market/`,
     `${origin}/earn/`,

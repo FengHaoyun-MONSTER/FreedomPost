@@ -53,6 +53,34 @@ export interface ProductInput {
   sortOrder: number;
 }
 
+export type ToolStatus = "draft" | "published";
+
+export interface StoredTool {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  description: string;
+  category: string;
+  url: string;
+  coverUrl: string | null;
+  status: ToolStatus;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ToolInput {
+  title: string;
+  summary: string;
+  description: string;
+  category: string;
+  url: string;
+  coverUrl: string | null;
+  status: ToolStatus;
+  sortOrder: number;
+}
+
 export type AffiliateStatus = "active" | "disabled";
 export type AffiliateOrderStatus = "pending" | "completed" | "canceled";
 export type AffiliateCommissionStatus = "not_due" | "pending" | "paid";
@@ -149,6 +177,11 @@ export interface ContentRepository {
   createProduct(input: ProductInput): Promise<StoredProduct>;
   updateProduct(id: string, input: ProductInput): Promise<StoredProduct | null>;
   deleteProduct(id: string): Promise<boolean>;
+  listTools(options?: { publishedOnly?: boolean }): Promise<StoredTool[]>;
+  getToolById(id: string): Promise<StoredTool | null>;
+  createTool(input: ToolInput): Promise<StoredTool>;
+  updateTool(id: string, input: ToolInput): Promise<StoredTool | null>;
+  deleteTool(id: string): Promise<boolean>;
   getAffiliateByWechatId(wechatId: string): Promise<StoredAffiliate | null>;
   createAffiliate(wechatId: string, passwordHash: string): Promise<StoredAffiliate>;
   listAffiliates(): Promise<Array<Omit<StoredAffiliate, "passwordHash"> & { totalClicks: number; uniqueClicks: number; orderCount: number }>>;

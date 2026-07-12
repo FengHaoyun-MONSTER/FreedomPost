@@ -2,7 +2,7 @@
 import "../styles/portal.css";
 
 interface Props {
-  activePage: "home" | "articles" | "topics" | "market" | "earn" | "guide" | "about";
+  activePage: "home" | "articles" | "tools" | "topics" | "market" | "earn" | "guide" | "about";
   title: string;
   description: string;
   hideFooter?: boolean;
@@ -17,6 +17,7 @@ const navItems = [
   { id: "market", href: "/market/", label: "商城" },
   { id: "earn", href: "/earn/", label: "分享赚钱", className: "earn-nav-link" },
   { id: "articles", href: "/articles/", label: "文章" },
+  { id: "tools", href: "/tools/", label: "博主常用工具" },
   { id: "topics", href: "/topics/", label: "专题" },
   { id: "guide", href: "/guide/", label: "使用指南" },
   { id: "about", href: "/about/", label: "关于" }

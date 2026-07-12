@@ -67,6 +67,21 @@ type AdminProduct = {
   updatedAt: string;
 };
 
+type AdminTool = {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  description: string;
+  category: string;
+  url: string;
+  coverUrl: string | null;
+  status: "draft" | "published";
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type AdminAffiliate = {
   id: string;
   wechatId: string;
@@ -119,10 +134,11 @@ function App() {
   const [password, setPassword] = useState("");
   const [posts, setPosts] = useState<AdminPost[]>([]);
   const [products, setProducts] = useState<AdminProduct[]>([]);
+  const [tools, setTools] = useState<AdminTool[]>([]);
   const [affiliates, setAffiliates] = useState<AdminAffiliate[]>([]);
   const [affiliateOrders, setAffiliateOrders] = useState<AdminAffiliateOrder[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [workspace, setWorkspace] = useState<"posts" | "products" | "distribution">("posts");
+  const [workspace, setWorkspace] = useState<"posts" | "products" | "tools" | "distribution">("posts");
   const [toast, setToast] = useState<Toast | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
@@ -154,7 +170,7 @@ function App() {
     const response = await fetch("/api/admin/session", { credentials: "include" });
     if (response.ok) {
       setAuthed(true);
-      await Promise.all([loadPosts(), loadProducts(), loadDistribution()]);
+      await Promise.all([loadPosts(), loadProducts(), loadTools(), loadDistribution()]);
     }
   }
 
@@ -174,7 +190,7 @@ function App() {
 
     setAuthed(true);
     setPassword("");
-    await Promise.all([loadPosts(), loadProducts(), loadDistribution()]);
+    await Promise.all([loadPosts(), loadProducts(), loadTools(), loadDistribution()]);
     showToast("已登录");
   }
 
@@ -183,6 +199,7 @@ function App() {
     setAuthed(false);
     setPosts([]);
     setProducts([]);
+    setTools([]);
     setAffiliates([]);
     setAffiliateOrders([]);
   }
@@ -206,6 +223,12 @@ function App() {
     setProducts(body.items);
   }
 
+  async function loadTools() {
+    const response = await fetch("/api/admin/tools", { credentials: "include" });
+    if (!response.ok) return;
+    setTools(((await response.json()) as { items: AdminTool[] }).items);
+  }
+
   async function loadDistribution() {
     const [affiliateResponse, orderResponse] = await Promise.all([
       fetch("/api/admin/affiliates", { credentials: "include" }),
@@ -218,6 +241,11 @@ function App() {
   function openProductWorkspace() {
     setWorkspace("products");
     void loadProducts();
+  }
+
+  function openToolsWorkspace() {
+    setWorkspace("tools");
+    void loadTools();
   }
 
   async function createPost() {
@@ -487,6 +515,7 @@ function App() {
         products={products}
         setProducts={setProducts}
         onOpenPosts={() => setWorkspace("posts")}
+        onOpenTools={openToolsWorkspace}
         onOpenDistribution={() => { setWorkspace("distribution"); void loadDistribution(); }}
         onRefresh={loadProducts}
         onLogout={logout}
@@ -496,8 +525,12 @@ function App() {
     );
   }
 
+  if (workspace === "tools") {
+    return <ToolWorkspace tools={tools} setTools={setTools} onOpenPosts={() => setWorkspace("posts")} onOpenProducts={openProductWorkspace} onOpenDistribution={() => { setWorkspace("distribution"); void loadDistribution(); }} onRefresh={loadTools} onLogout={logout} showToast={showToast} toast={toast} />;
+  }
+
   if (workspace === "distribution") {
-    return <DistributionWorkspace affiliates={affiliates} orders={affiliateOrders} setAffiliates={setAffiliates} setOrders={setAffiliateOrders} onOpenPosts={() => setWorkspace("posts")} onOpenProducts={openProductWorkspace} onRefresh={loadDistribution} onLogout={logout} showToast={showToast} toast={toast} />;
+    return <DistributionWorkspace affiliates={affiliates} orders={affiliateOrders} setAffiliates={setAffiliates} setOrders={setAffiliateOrders} onOpenPosts={() => setWorkspace("posts")} onOpenProducts={openProductWorkspace} onOpenTools={openToolsWorkspace} onRefresh={loadDistribution} onLogout={logout} showToast={showToast} toast={toast} />;
   }
 
   return (
@@ -506,6 +539,7 @@ function App() {
         <div className="workspace-tabs" role="tablist" aria-label="后台工作区">
           <button className="active" type="button" role="tab" aria-selected="true">文章</button>
           <button type="button" role="tab" aria-selected="false" onClick={openProductWorkspace}>商品</button>
+          <button type="button" role="tab" aria-selected="false" onClick={openToolsWorkspace}>工具</button>
           <button type="button" role="tab" aria-selected="false" onClick={() => { setWorkspace("distribution"); void loadDistribution(); }}>分销</button>
         </div>
         <div className="rail-head">
@@ -720,6 +754,7 @@ function ProductWorkspace({
   setProducts,
   onOpenPosts,
   onOpenDistribution,
+  onOpenTools,
   onRefresh,
   onLogout,
   showToast,
@@ -729,6 +764,7 @@ function ProductWorkspace({
   setProducts: (next: AdminProduct[] | ((items: AdminProduct[]) => AdminProduct[])) => void;
   onOpenPosts: () => void;
   onOpenDistribution: () => void;
+  onOpenTools: () => void;
   onRefresh: () => Promise<void>;
   onLogout: () => Promise<void>;
   showToast: (text: string) => void;
@@ -803,6 +839,7 @@ function ProductWorkspace({
         <div className="workspace-tabs" role="tablist" aria-label="后台工作区">
           <button type="button" role="tab" aria-selected="false" onClick={onOpenPosts}>文章</button>
           <button className="active" type="button" role="tab" aria-selected="true">商品</button>
+          <button type="button" role="tab" aria-selected="false" onClick={onOpenTools}>工具</button>
           <button type="button" role="tab" aria-selected="false" onClick={onOpenDistribution}>分销</button>
         </div>
         <div className="rail-head">
@@ -860,6 +897,125 @@ function defaultProductPayload(): Omit<AdminProduct, "id" | "slug" | "createdAt"
   return { title: "未命名商品", summary: "请填写商品简介", description: "请填写商品详情", category: "service", priceCents: 0, commissionCents: 0, compareAtCents: null, currency: "CNY", stock: -1, soldCount: 0, coverUrl: null, status: "draft", sortOrder: 0 };
 }
 
+function ToolWorkspace({
+  tools,
+  setTools,
+  onOpenPosts,
+  onOpenProducts,
+  onOpenDistribution,
+  onRefresh,
+  onLogout,
+  showToast,
+  toast
+}: {
+  tools: AdminTool[];
+  setTools: (next: AdminTool[] | ((items: AdminTool[]) => AdminTool[])) => void;
+  onOpenPosts: () => void;
+  onOpenProducts: () => void;
+  onOpenDistribution: () => void;
+  onRefresh: () => Promise<void>;
+  onLogout: () => Promise<void>;
+  showToast: (text: string) => void;
+  toast: Toast | null;
+}) {
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
+  const activeTool = useMemo(() => tools.find((tool) => tool.id === activeId) ?? tools[0], [tools, activeId]);
+
+  useEffect(() => {
+    setActiveId((current) => current ?? tools[0]?.id ?? null);
+  }, [tools]);
+
+  function patchTool(patch: Partial<AdminTool>) {
+    if (!activeTool) return;
+    setTools((items) => items.map((item) => item.id === activeTool.id ? { ...item, ...patch } : item));
+  }
+
+  async function createTool() {
+    const response = await fetch("/api/admin/tools", { method: "POST", headers: { "content-type": "application/json" }, credentials: "include", body: JSON.stringify(defaultToolPayload()) });
+    if (!response.ok) return showToast("创建工具失败");
+    const created = await response.json() as AdminTool;
+    setTools((items) => [created, ...items]);
+    setActiveId(created.id);
+    showToast("工具草稿已创建");
+  }
+
+  async function saveTool() {
+    if (!activeTool) return;
+    const response = await fetch(`/api/admin/tools/${activeTool.id}`, { method: "PUT", headers: { "content-type": "application/json" }, credentials: "include", body: JSON.stringify(toolPayload(activeTool)) });
+    if (!response.ok) return showToast("保存失败，请检查工具信息");
+    const saved = await response.json() as AdminTool;
+    setTools((items) => items.map((item) => item.id === saved.id ? saved : item));
+    showToast(saved.status === "published" ? "工具已发布" : "工具草稿已保存");
+  }
+
+  async function deleteTool() {
+    if (!activeTool || !confirm(`确认删除工具《${activeTool.title}》？`)) return;
+    const response = await fetch(`/api/admin/tools/${activeTool.id}`, { method: "DELETE", credentials: "include" });
+    if (!response.ok) return showToast("删除失败");
+    setTools((items) => items.filter((item) => item.id !== activeTool.id));
+    setActiveId(null);
+    showToast("工具已删除");
+  }
+
+  async function uploadCover(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return showToast("封面只能使用图片文件");
+    try {
+      const uploaded = await uploadFile(file);
+      patchTool({ coverUrl: uploaded.url });
+      showToast("封面已上传，保存工具后生效");
+    } catch {
+      showToast("封面上传失败");
+    }
+  }
+
+  return (
+    <main className="admin-shell">
+      <aside className="post-rail">
+        <div className="workspace-tabs" role="tablist" aria-label="后台工作区">
+          <button type="button" role="tab" aria-selected="false" onClick={onOpenPosts}>文章</button>
+          <button type="button" role="tab" aria-selected="false" onClick={onOpenProducts}>商品</button>
+          <button className="active" type="button" role="tab" aria-selected="true">工具</button>
+          <button type="button" role="tab" aria-selected="false" onClick={onOpenDistribution}>分销</button>
+        </div>
+        <div className="rail-head"><strong>工具管理</strong><button className="icon-button" type="button" onClick={createTool} title="新建工具"><Plus size={17} /></button></div>
+        <div className="rail-actions"><button type="button" onClick={() => void onRefresh()}><RefreshCw size={15} />刷新</button><button type="button" onClick={() => void onLogout()}><LogOut size={15} />退出</button></div>
+        <div className="post-list product-list">{tools.map((tool) => <button key={tool.id} type="button" className={tool.id === activeTool?.id ? "active" : ""} onClick={() => setActiveId(tool.id)}><span>{tool.title}</span><small>{tool.status === "published" ? "已发布" : "草稿"} · {tool.category}</small></button>)}</div>
+      </aside>
+      <section className="editor-pane product-editor-pane">
+        {activeTool ? <>
+          <header className="editor-topbar"><div><strong>{activeTool.title}</strong><span>/tools/{activeTool.slug}</span></div></header>
+          <div className="editor-workspace product-workspace">
+            <div className="product-form-grid">
+              <label className="title-field product-title-field"><span>工具名称</span><input value={activeTool.title} onChange={(event) => patchTool({ title: event.target.value })} /></label>
+              <label><span>分类</span><select value={activeTool.category} onChange={(event) => patchTool({ category: event.target.value })}><option value="writing">写作</option><option value="design">设计</option><option value="productivity">效率</option><option value="other">其它</option></select></label>
+              <label><span>排序</span><input type="number" value={activeTool.sortOrder} onChange={(event) => patchTool({ sortOrder: Number(event.target.value) || 0 })} /></label>
+              <label><span>发布状态</span><select value={activeTool.status} onChange={(event) => patchTool({ status: event.target.value as AdminTool["status"] })}><option value="draft">草稿</option><option value="published">公开发布</option></select></label>
+            </div>
+            <label className="wide-field"><span>工具网址</span><input type="url" maxLength={2000} value={activeTool.url} onChange={(event) => patchTool({ url: event.target.value })} placeholder="https://" /></label>
+            <label className="wide-field"><span>一句话简介</span><input maxLength={500} value={activeTool.summary} onChange={(event) => patchTool({ summary: event.target.value })} /></label>
+            <div className="product-cover-row"><div className="product-cover-preview">{activeTool.coverUrl ? <img src={activeTool.coverUrl} alt="工具封面" /> : <Package size={30} />}</div><div><strong>工具封面</strong><p>可选，建议使用横向图片。</p><button type="button" onClick={() => coverInputRef.current?.click()}><ImagePlus size={15} />上传封面</button><input ref={coverInputRef} className="hidden-input" type="file" accept="image/*" onChange={(event) => { void uploadCover(event.target.files); event.target.value = ""; }} /></div></div>
+            <label className="wide-field"><span>工具介绍</span><textarea rows={12} maxLength={12000} value={activeTool.description} onChange={(event) => patchTool({ description: event.target.value })} /></label>
+          </div>
+          <div className="toolbar product-toolbar"><span className="product-status-note">{activeTool.status === "published" ? "公开页可见" : "仅后台可见"}</span><span className="toolbar-fill" /><button className="danger-button" type="button" onClick={() => void deleteTool()}><Trash2 size={15} />删除</button><button className="primary" type="button" onClick={() => void saveTool()}><Save size={15} />保存</button></div>
+        </> : <div className="empty-state">暂无工具，点击左上角加号创建第一个工具。</div>}
+      </section>
+      {toast && <div className="toast">{toast.text}</div>}
+    </main>
+  );
+}
+
+function defaultToolPayload(): Omit<AdminTool, "id" | "slug" | "createdAt" | "updatedAt"> {
+  return { title: "未命名工具", summary: "请填写工具简介", description: "请填写工具介绍", category: "other", url: "https://", coverUrl: null, status: "draft", sortOrder: 0 };
+}
+
+function toolPayload(tool: AdminTool) {
+  const { id: _id, slug: _slug, createdAt: _createdAt, updatedAt: _updatedAt, ...payload } = tool;
+  return payload;
+}
+
 function DistributionWorkspace({
   affiliates,
   orders,
@@ -867,6 +1023,7 @@ function DistributionWorkspace({
   setOrders,
   onOpenPosts,
   onOpenProducts,
+  onOpenTools,
   onRefresh,
   onLogout,
   showToast,
@@ -878,6 +1035,7 @@ function DistributionWorkspace({
   setOrders: (next: AdminAffiliateOrder[] | ((items: AdminAffiliateOrder[]) => AdminAffiliateOrder[])) => void;
   onOpenPosts: () => void;
   onOpenProducts: () => void;
+  onOpenTools: () => void;
   onRefresh: () => Promise<void>;
   onLogout: () => Promise<void>;
   showToast: (text: string) => void;
@@ -935,6 +1093,7 @@ function DistributionWorkspace({
         <div className="workspace-tabs" role="tablist" aria-label="后台工作区">
           <button type="button" role="tab" aria-selected="false" onClick={onOpenPosts}>文章</button>
           <button type="button" role="tab" aria-selected="false" onClick={onOpenProducts}>商品</button>
+          <button type="button" role="tab" aria-selected="false" onClick={onOpenTools}>工具</button>
           <button className="active" type="button" role="tab" aria-selected="true">分销</button>
         </div>
         <div className="rail-head"><strong>推广者</strong><span>{affiliates.length} 人</span></div>

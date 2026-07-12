@@ -18,6 +18,8 @@ import type {
   RecordViewInput,
   RecordViewResult,
   StoredPost,
+  StoredTool,
+  ToolInput,
   StoredAffiliate,
   StoredAffiliateOrder,
   StoredProduct,
@@ -46,6 +48,7 @@ export function createSeedPosts(): StoredPost[] {
 export class MemoryContentRepository implements ContentRepository {
   private readonly posts = new Map<string, StoredPost>();
   private readonly products = new Map<string, StoredProduct>();
+  private readonly tools = new Map<string, StoredTool>();
   private readonly affiliates = new Map<string, StoredAffiliate>();
   private readonly affiliateClicks: Array<{ affiliateId: string; visitorKey: string; clickedAt: string; isUnique: boolean }> = [];
   private readonly affiliateOrders = new Map<string, StoredAffiliateOrder>();
@@ -229,6 +232,42 @@ export class MemoryContentRepository implements ContentRepository {
     return this.products.delete(id);
   }
 
+  async listTools(options: { publishedOnly?: boolean } = {}): Promise<StoredTool[]> {
+    return [...this.tools.values()]
+      .filter((tool) => !options.publishedOnly || tool.status === "published")
+      .sort((left, right) => right.sortOrder - left.sortOrder || right.createdAt.localeCompare(left.createdAt));
+  }
+
+  async getToolById(id: string): Promise<StoredTool | null> {
+    return this.tools.get(id) ?? null;
+  }
+
+  async createTool(input: ToolInput): Promise<StoredTool> {
+    const createdAt = new Date().toISOString();
+    const tool: StoredTool = {
+      id: crypto.randomUUID(),
+      slug: await this.uniqueToolSlug(input.title),
+      ...input,
+      title: input.title.trim() || "未命名工具",
+      createdAt,
+      updatedAt: createdAt
+    };
+    this.tools.set(tool.id, tool);
+    return tool;
+  }
+
+  async updateTool(id: string, input: ToolInput): Promise<StoredTool | null> {
+    const existing = this.tools.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...input, title: input.title.trim() || existing.title, updatedAt: new Date().toISOString() };
+    this.tools.set(id, updated);
+    return updated;
+  }
+
+  async deleteTool(id: string): Promise<boolean> {
+    return this.tools.delete(id);
+  }
+
   async getAffiliateByWechatId(wechatId: string): Promise<StoredAffiliate | null> {
     return [...this.affiliates.values()].find((affiliate) => affiliate.wechatId === wechatId) ?? null;
   }
@@ -339,6 +378,15 @@ export class MemoryContentRepository implements ContentRepository {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const slug = attempt === 0 ? base : `${base}-${attempt + 1}`;
       if (!(await this.getProductBySlug(slug))) return slug;
+    }
+    return `${base}-${crypto.randomUUID().slice(0, 8)}`;
+  }
+
+  private async uniqueToolSlug(title: string): Promise<string> {
+    const base = makeSlug(title || "tool");
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const slug = attempt === 0 ? base : `${base}-${attempt + 1}`;
+      if (![...this.tools.values()].some((tool) => tool.slug === slug)) return slug;
     }
     return `${base}-${crypto.randomUUID().slice(0, 8)}`;
   }

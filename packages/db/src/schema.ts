@@ -65,6 +65,28 @@ export const products = pgTable(
   })
 );
 
+export const tools = pgTable(
+  "tools",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    slug: varchar("slug", { length: 64 }).notNull().unique(),
+    title: text("title").notNull(),
+    summary: text("summary").notNull().default(""),
+    description: text("description").notNull().default(""),
+    category: varchar("category", { length: 32 }).notNull().default("other"),
+    url: text("url").notNull(),
+    coverUrl: text("cover_url"),
+    status: varchar("status", { length: 16 }).notNull().default("draft"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    createdAtIdx: index("idx_tools_created_at").on(table.createdAt),
+    statusIdx: index("idx_tools_status_sort").on(table.status, table.sortOrder)
+  })
+);
+
 export const affiliates = pgTable(
   "affiliates",
   {

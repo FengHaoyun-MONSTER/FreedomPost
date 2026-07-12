@@ -138,6 +138,31 @@ describe("api app", () => {
     expect(deleted.statusCode).toBe(200);
   });
 
+  it("publishes creator tools through the admin API and hides drafts", async () => {
+    const app = buildApp({ repository: new MemoryContentRepository() });
+    const cookie = await adminCookie(app);
+    const payload = {
+      title: "创作工具",
+      summary: "帮助整理写作素材",
+      description: "一个常用的创作辅助网站。",
+      category: "writing",
+      url: "https://example.com/tool",
+      coverUrl: null,
+      status: "draft",
+      sortOrder: 0
+    };
+    const draft = await app.inject({ method: "POST", url: "/api/admin/tools", headers: { cookie }, payload });
+    const publicDrafts = await app.inject({ method: "GET", url: "/api/tools" });
+    const published = await app.inject({ method: "PUT", url: `/api/admin/tools/${draft.json().id}`, headers: { cookie }, payload: { ...payload, status: "published" } });
+    const publicTools = await app.inject({ method: "GET", url: "/api/tools" });
+    await app.close();
+
+    expect(draft.statusCode).toBe(201);
+    expect(publicDrafts.json().items).toHaveLength(0);
+    expect(published.statusCode).toBe(200);
+    expect(publicTools.json().items).toMatchObject([{ title: "创作工具", url: "https://example.com/tool", status: "published" }]);
+  });
+
   it("protects affiliate dashboards and snapshots referred orders", async () => {
     const app = buildApp({ repository: new MemoryContentRepository() });
     const admin = await adminCookie(app);
