@@ -59,6 +59,7 @@ type AdminProduct = {
   compareAtCents: number | null;
   currency: string;
   stock: number;
+  soldCount: number;
   coverUrl: string | null;
   status: "draft" | "published";
   sortOrder: number;
@@ -835,6 +836,7 @@ function ProductWorkspace({
                 <label><span>划线价（可选）</span><input type="number" min="0" step="0.01" value={activeProduct.compareAtCents === null ? "" : formatPriceInput(activeProduct.compareAtCents)} onChange={(event) => patchProduct({ compareAtCents: event.target.value ? priceToCents(event.target.value) : null })} /></label>
                 <label><span>币种</span><select value={activeProduct.currency} onChange={(event) => patchProduct({ currency: event.target.value })}><option value="CNY">CNY</option><option value="USD">USD</option></select></label>
                 <label><span>库存</span><input type="number" min="-1" step="1" value={activeProduct.stock} onChange={(event) => patchProduct({ stock: Number(event.target.value) || 0 })} /><small>-1 表示不限量</small></label>
+                <label><span>已售出</span><input type="number" min="0" step="1" value={activeProduct.soldCount} onChange={(event) => patchProduct({ soldCount: Number(event.target.value) || 0 })} /><small>商城展示的累计销量</small></label>
                 <label><span>排序</span><input type="number" value={activeProduct.sortOrder} onChange={(event) => patchProduct({ sortOrder: Number(event.target.value) || 0 })} /></label>
                 <label><span>发布状态</span><select value={activeProduct.status} onChange={(event) => patchProduct({ status: event.target.value as AdminProduct["status"] })}><option value="draft">草稿</option><option value="published">公开发布</option></select></label>
               </div>
@@ -855,7 +857,7 @@ function ProductWorkspace({
 }
 
 function defaultProductPayload(): Omit<AdminProduct, "id" | "slug" | "createdAt" | "updatedAt"> {
-  return { title: "未命名商品", summary: "请填写商品简介", description: "请填写商品详情", category: "service", priceCents: 0, commissionCents: 0, compareAtCents: null, currency: "CNY", stock: -1, coverUrl: null, status: "draft", sortOrder: 0 };
+  return { title: "未命名商品", summary: "请填写商品简介", description: "请填写商品详情", category: "service", priceCents: 0, commissionCents: 0, compareAtCents: null, currency: "CNY", stock: -1, soldCount: 0, coverUrl: null, status: "draft", sortOrder: 0 };
 }
 
 function DistributionWorkspace({

@@ -29,6 +29,7 @@ export interface StoredProduct {
   compareAtCents: number | null;
   currency: string;
   stock: number;
+  soldCount: number;
   coverUrl: string | null;
   status: ProductStatus;
   sortOrder: number;
@@ -46,6 +47,7 @@ export interface ProductInput {
   compareAtCents: number | null;
   currency: string;
   stock: number;
+  soldCount: number;
   coverUrl: string | null;
   status: ProductStatus;
   sortOrder: number;

@@ -29,6 +29,7 @@ type StoreProduct = {
   compareAtCents: number | null;
   currency: string;
   stock: number;
+  soldCount: number;
   coverUrl: string | null;
   status: "published";
 };
@@ -320,7 +321,7 @@ async function hydrateMarket() {
 }
 
 function renderMarketProduct(product: StoreProduct) {
-  const availability = product.stock === 0 ? "暂时售罄" : product.stock < 0 ? "不限量" : `库存 ${product.stock}`;
+  const availability = product.stock === 0 ? `已售出 ${product.soldCount} · 暂时售罄` : product.stock < 0 ? `已售出 ${product.soldCount} · 不限量` : `已售出 ${product.soldCount} · 库存 ${product.stock}`;
   const cover = product.coverUrl
     ? `<img src="${escapeAttribute(product.coverUrl)}" alt="${escapeAttribute(product.title)}" />`
     : `<span class="market-product-placeholder"><i data-lucide="package"></i></span>`;
@@ -339,7 +340,7 @@ function renderMarketProduct(product: StoreProduct) {
 
 function renderProductDialog(product: StoreProduct) {
   const cover = product.coverUrl ? `<img src="${escapeAttribute(product.coverUrl)}" alt="${escapeAttribute(product.title)}" />` : "";
-  const availability = product.stock === 0 ? "暂时售罄" : product.stock < 0 ? "不限量供应" : `当前库存 ${product.stock}`;
+  const availability = product.stock === 0 ? `已售出 ${product.soldCount} · 暂时售罄` : product.stock < 0 ? `已售出 ${product.soldCount} · 不限量供应` : `已售出 ${product.soldCount} · 当前库存 ${product.stock}`;
   const commission = product.commissionCents > 0 ? ` · 可得 ${formatCurrency(product.commissionCents, product.currency)}` : "";
   return `<div class="product-dialog-cover">${cover}</div><p class="section-kicker">${escapeHtml(productCategoryLabel(product.category))}</p><h2>${escapeHtml(product.title)}</h2><p class="product-dialog-summary">${escapeHtml(product.summary)}</p><div class="product-dialog-price">${formatCurrency(product.priceCents, product.currency)} <span>${availability}</span></div><div class="product-dialog-description">${escapeHtml(product.description).replace(/\n/g, "<br>")}</div><div class="product-dialog-actions"><button class="button secondary" type="button" data-share-product>分享此商品赚钱${escapeHtml(commission)}</button><button class="button primary" type="button" data-order-product ${product.stock === 0 ? "disabled" : ""}>立即下单</button></div>`;
 }

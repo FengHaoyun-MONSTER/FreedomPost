@@ -523,6 +523,7 @@ function mapProductRow(row: ProductRow): StoredProduct {
     compareAtCents: row.compareAtCents,
     currency: row.currency,
     stock: row.stock,
+    soldCount: row.soldCount,
     coverUrl: row.coverUrl,
     status: row.status === "published" ? "published" : "draft",
     sortOrder: row.sortOrder,

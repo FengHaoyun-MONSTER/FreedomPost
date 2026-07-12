@@ -678,12 +678,13 @@ function normalizeProductInput(value: unknown): ProductInput | null {
   const commissionCents = readInteger(input.commissionCents ?? 0, 0, 100_000_000);
   const compareAtCents = input.compareAtCents === null || input.compareAtCents === "" ? null : readInteger(input.compareAtCents, 0, 100_000_000);
   const stock = readInteger(input.stock, -1, 1_000_000);
+  const soldCount = readInteger(input.soldCount ?? 0, 0, 1_000_000);
   const sortOrder = readInteger(input.sortOrder, -100_000, 100_000);
 
-  if (!title || !summary || !description || !status || priceCents === null || commissionCents === null || stock === null || sortOrder === null) return null;
+  if (!title || !summary || !description || !status || priceCents === null || commissionCents === null || stock === null || soldCount === null || sortOrder === null) return null;
   if (compareAtCents === undefined || (compareAtCents !== null && compareAtCents < priceCents)) return null;
 
-  return { title, summary, description, category, priceCents, commissionCents, compareAtCents, currency, stock, coverUrl, status, sortOrder };
+  return { title, summary, description, category, priceCents, commissionCents, compareAtCents, currency, stock, soldCount, coverUrl, status, sortOrder };
 }
 
 function getAffiliateSession(token: string | undefined) {

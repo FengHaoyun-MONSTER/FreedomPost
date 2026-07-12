@@ -52,6 +52,7 @@ export const products = pgTable(
     compareAtCents: integer("compare_at_cents"),
     currency: varchar("currency", { length: 8 }).notNull().default("CNY"),
     stock: integer("stock").notNull().default(-1),
+    soldCount: integer("sold_count").notNull().default(0),
     coverUrl: text("cover_url"),
     status: varchar("status", { length: 16 }).notNull().default("draft"),
     sortOrder: integer("sort_order").notNull().default(0),
