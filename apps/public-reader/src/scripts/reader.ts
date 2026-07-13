@@ -109,9 +109,7 @@ const commentUser = mustGet<HTMLElement>("commentUser");
 const commentDefaultPlaceholder = "写下评论或者粘贴图片或者拖入文件";
 
 const initial = readInitialPayload();
-const pathSlug = location.pathname.startsWith("/p/")
-  ? decodeURIComponent(location.pathname.split("/p/")[1]?.split("/")[0] ?? "").trim()
-  : null;
+const pathSlug = readPathSlug();
 const requestedSlug = new URLSearchParams(location.search).get("post")?.trim() || pathSlug || null;
 let activeSlug = requestedSlug ?? initial?.slug ?? document.body.dataset.activeSlug ?? "";
 let posts: PostListItem[] = [];
@@ -151,42 +149,49 @@ async function init() {
   renderComments();
   void refreshComments(activeSlug);
   bindEvents();
-  const shouldHydrateRequestedArticle = Boolean(initial && initial.slug !== activeSlug && activeSlug);
-  const requestedArticleHydration = shouldHydrateRequestedArticle
-    ? openArticle(activeSlug, { push: false, countView: false })
-    : Promise.resolve();
+  const requestedArticleHydration = requestedSlug ? hydrateRequestedArticle(requestedSlug) : null;
 
   try {
     const [postItems, searchPayload] = await Promise.all([fetchPostSummaries(), fetchSearchPayload()]);
     posts = postItems;
     searchDocs = searchPayload.documents;
     renderList();
-    if (shouldHydrateRequestedArticle) {
-      await requestedArticleHydration;
-      if (!articleCache.has(activeSlug)) return;
-    }
-    if (posts.length > 0) {
-      const nextSlug = posts.some((post) => post.slug === activeSlug)
-        ? activeSlug
-        : requestedSlug && posts.some((post) => post.slug === requestedSlug)
-          ? requestedSlug
-          : posts[0]?.slug;
-      if (nextSlug) {
-        if (!(shouldHydrateRequestedArticle && nextSlug === activeSlug)) {
-          articleCache.delete(nextSlug);
-          await openArticle(nextSlug, { push: location.pathname.startsWith("/p/") && nextSlug !== activeSlug });
-        }
-      }
-    } else {
-      await requestedArticleHydration;
-    }
-    prefetchIdleArticles();
   } catch {
     listMeta.textContent = "文章列表暂不可用";
   }
 
+  if (requestedSlug && requestedArticleHydration) {
+    await requestedArticleHydration;
+    if (!articleCache.has(requestedSlug) || activeSlug !== requestedSlug) return;
+  } else if (posts.length > 0) {
+    const nextSlug = posts.some((post) => post.slug === activeSlug) ? activeSlug : posts[0]?.slug;
+    if (nextSlug) {
+      articleCache.delete(nextSlug);
+      await openArticle(nextSlug, { push: false, countView: false });
+    }
+  }
+
+  prefetchIdleArticles();
+
   commentUser.textContent = getRandomUsername();
   countViewOnce(activeSlug);
+}
+
+async function hydrateRequestedArticle(slug: string) {
+  // A URL slug is authoritative and must never be replaced by the first list item.
+  articleCache.delete(slug);
+  await openArticle(slug, { push: false, countView: false });
+}
+
+function readPathSlug() {
+  if (!location.pathname.startsWith("/p/")) return null;
+
+  const encodedSlug = location.pathname.split("/p/")[1]?.split("/")[0] ?? "";
+  try {
+    return decodeURIComponent(encodedSlug).trim() || null;
+  } catch {
+    return null;
+  }
 }
 
 function bindEvents() {
