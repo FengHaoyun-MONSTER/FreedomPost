@@ -25,6 +25,7 @@ export const posts = pgTable(
     contentHtml: text("content_html").notNull(),
     searchText: text("search_text").notNull(),
     excerpt: text("excerpt"),
+    visibility: varchar("visibility", { length: 16 }).notNull().default("public"),
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
     viewCount: bigint("view_count", { mode: "number" }).notNull().default(0),

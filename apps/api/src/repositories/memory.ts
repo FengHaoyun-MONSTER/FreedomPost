@@ -39,6 +39,7 @@ export function createSeedPosts(): StoredPost[] {
         "# FreedomPost 第一篇：把阅读体验放在正中间\n\n这里是 API 的示例文章。真实数据会在接入 PostgreSQL 后从 posts 表读取。\n\n```ts\nconsole.log('FreedomPost')\n```",
       createdAt: now,
       updatedAt: now,
+      visibility: "public",
       viewCount: 128,
       commentCount: 0,
       attachmentCount: 0
@@ -68,7 +69,7 @@ export class MemoryContentRepository implements ContentRepository {
   }
 
   async listPostSummaries() {
-    const posts = await this.listPosts();
+    const posts = (await this.listPosts()).filter((post) => post.visibility === "public");
     return posts.map((post) =>
       toPostListItem({
         ...post,
@@ -86,7 +87,7 @@ export class MemoryContentRepository implements ContentRepository {
   }
 
   async getSearchDocuments() {
-    return (await this.listPosts()).map(toSearchDocument);
+    return (await this.listPosts()).filter((post) => post.visibility === "public").map(toSearchDocument);
   }
 
   async createPost(input: CreatePostInput): Promise<StoredPost> {
@@ -96,6 +97,7 @@ export class MemoryContentRepository implements ContentRepository {
       slug: makeSlug(input.title),
       title: input.title.trim() || "未命名文章",
       markdown: input.markdown,
+      visibility: input.visibility ?? "public",
       createdAt,
       updatedAt: createdAt,
       viewCount: 0,
@@ -115,6 +117,7 @@ export class MemoryContentRepository implements ContentRepository {
       ...post,
       title: input.title.trim() || post.title,
       markdown: input.markdown,
+      visibility: input.visibility ?? post.visibility,
       updatedAt: new Date().toISOString()
     });
 

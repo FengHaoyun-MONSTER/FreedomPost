@@ -231,7 +231,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   app.get<{ Params: { slug: string } }>("/api/posts/:slug", async (request, reply) => {
     const post = await repository.getPostBySlug(request.params.slug);
-    if (!post) {
+    if (!post || post.visibility !== "public") {
       return reply.code(404).send(errorBody("POST_NOT_FOUND", "文章不存在"));
     }
 
@@ -273,6 +273,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     Params: { slug: string };
     Body: { fingerprint?: string; localId?: string };
   }>("/api/posts/:slug/view", async (request, reply) => {
+    const post = await repository.getPostBySlug(request.params.slug);
+    if (!post || post.visibility !== "public") {
+      return reply.code(404).send(errorBody("POST_NOT_FOUND", "文章不存在"));
+    }
     const date = new Date().toISOString().slice(0, 10);
     const visitorKey = hashVisitorKey({
       ip: request.ip,
@@ -297,14 +301,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     return result;
   });
 
-  app.get<{ Params: { slug: string } }>("/api/posts/:slug/comments", async (request) => ({
-    items: await repository.listComments(request.params.slug),
-    nextCursor: null
-  }));
+  app.get<{ Params: { slug: string } }>("/api/posts/:slug/comments", async (request, reply) => {
+    const post = await repository.getPostBySlug(request.params.slug);
+    if (!post || post.visibility !== "public") {
+      return reply.code(404).send(errorBody("POST_NOT_FOUND", "文章不存在"));
+    }
+    return { items: await repository.listComments(request.params.slug), nextCursor: null };
+  });
 
   app.post<{ Params: { slug: string } }>("/api/posts/:slug/comment-attachments", async (request, reply) => {
     const post = await repository.getPostBySlug(request.params.slug);
-    if (!post) {
+    if (!post || post.visibility !== "public") {
       return reply.code(404).send(errorBody("POST_NOT_FOUND", "文章不存在"));
     }
 
@@ -361,7 +368,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     };
   }>("/api/posts/:slug/comments", async (request, reply) => {
     const post = await repository.getPostBySlug(request.params.slug);
-    if (!post) {
+    if (!post || post.visibility !== "public") {
       return reply.code(404).send(errorBody("POST_NOT_FOUND", "文章不存在"));
     }
 
@@ -637,7 +644,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.post<{
-    Body: { title?: string; markdown?: string };
+    Body: { title?: string; markdown?: string; visibility?: string };
   }>("/api/admin/posts", async (request, reply) => {
     if (!getSession(request.cookies.fp_session)) {
       return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
@@ -645,7 +652,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
     const post = await repository.createPost({
       title: request.body?.title?.trim() || "未命名文章",
-      markdown: request.body?.markdown ?? ""
+      markdown: request.body?.markdown ?? "",
+      visibility: request.body?.visibility === "private" ? "private" : "public"
     });
 
     return reply.code(201).send(post);
@@ -653,7 +661,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   app.put<{
     Params: { id: string };
-    Body: { title?: string; markdown?: string };
+    Body: { title?: string; markdown?: string; visibility?: string };
   }>("/api/admin/posts/:id", async (request, reply) => {
     if (!getSession(request.cookies.fp_session)) {
       return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
@@ -669,7 +677,8 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     const updated = await repository.updatePost({
       id: request.params.id,
       title: request.body?.title?.trim() || existing.title,
-      markdown: nextMarkdown
+      markdown: nextMarkdown,
+      visibility: request.body?.visibility === "private" ? "private" : request.body?.visibility === "public" ? "public" : existing.visibility
     });
 
     if (!updated) {

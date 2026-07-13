@@ -127,6 +127,8 @@ let commentSubmitting = false;
 const articleCache = new Map<string, ArticleCacheItem>();
 const commentCache = new Map<string, StoredComment[]>();
 
+class ApiPostNotFoundError extends Error {}
+
 if (initial) {
   articleCache.set(initial.slug, {
     slug: initial.slug,
@@ -159,6 +161,10 @@ async function init() {
     posts = postItems;
     searchDocs = searchPayload.documents;
     renderList();
+    if (shouldHydrateRequestedArticle) {
+      await requestedArticleHydration;
+      if (!articleCache.has(activeSlug)) return;
+    }
     if (posts.length > 0) {
       const nextSlug = posts.some((post) => post.slug === activeSlug)
         ? activeSlug
@@ -166,9 +172,7 @@ async function init() {
           ? requestedSlug
           : posts[0]?.slug;
       if (nextSlug) {
-        if (shouldHydrateRequestedArticle && nextSlug === activeSlug) {
-          await requestedArticleHydration;
-        } else {
+        if (!(shouldHydrateRequestedArticle && nextSlug === activeSlug)) {
           articleCache.delete(nextSlug);
           await openArticle(nextSlug, { push: location.pathname.startsWith("/p/") && nextSlug !== activeSlug });
         }
@@ -309,6 +313,7 @@ async function openArticle(
   const cached = articleCache.get(slug) ?? (await prefetchArticle(slug));
   if (!cached) {
     document.documentElement.classList.remove("article-boot-pending");
+    if (location.pathname.startsWith("/p/")) location.replace("/");
     return;
   }
 
@@ -346,7 +351,12 @@ async function prefetchArticle(slug: string) {
   const cached = articleCache.get(slug);
   if (cached) return cached;
 
-  const apiItem = await fetchArticleFromApi(slug);
+  let apiItem: ArticleCacheItem | null = null;
+  try {
+    apiItem = await fetchArticleFromApi(slug);
+  } catch (error) {
+    if (error instanceof ApiPostNotFoundError) return null;
+  }
   if (apiItem) {
     articleCache.set(slug, apiItem);
     return apiItem;
@@ -375,7 +385,10 @@ async function prefetchArticle(slug: string) {
 
 async function fetchArticleFromApi(slug: string): Promise<ArticleCacheItem | null> {
   try {
-    const payload = await fetchJson<{ item: ApiPostDetail }>(`/api/posts/${encodeURIComponent(slug)}`);
+    const response = await fetch(`/api/posts/${encodeURIComponent(slug)}`);
+    if (response.status === 404) throw new ApiPostNotFoundError("Article is not public");
+    if (!response.ok) throw new Error(`Failed to fetch article ${slug}`);
+    const payload = (await response.json()) as { item: ApiPostDetail };
     const item = payload.item;
     return {
       slug: item.slug,
@@ -394,7 +407,8 @@ async function fetchArticleFromApi(slug: string): Promise<ArticleCacheItem | nul
       },
       cachedAt: Date.now()
     };
-  } catch {
+  } catch (error) {
+    if (error instanceof ApiPostNotFoundError) throw error;
     return null;
   }
 }

@@ -69,7 +69,7 @@ export class PostgresContentRepository implements ContentRepository {
   }
 
   async listPostSummaries() {
-    return (await this.listPosts()).map(toPostListItem);
+    return (await this.listPosts()).filter((post) => post.visibility === "public").map(toPostListItem);
   }
 
   async getPostBySlug(slug: string): Promise<StoredPost | null> {
@@ -83,7 +83,7 @@ export class PostgresContentRepository implements ContentRepository {
   }
 
   async getSearchDocuments() {
-    return (await this.listPosts()).map(toSearchDocument);
+    return (await this.listPosts()).filter((post) => post.visibility === "public").map(toSearchDocument);
   }
 
   async createPost(input: CreatePostInput): Promise<StoredPost> {
@@ -94,6 +94,7 @@ export class PostgresContentRepository implements ContentRepository {
       slug,
       title: input.title.trim() || "未命名文章",
       markdown: input.markdown,
+      visibility: input.visibility ?? "public",
       createdAt,
       updatedAt: createdAt,
       viewCount: 0,
@@ -112,6 +113,7 @@ export class PostgresContentRepository implements ContentRepository {
         contentHtml: rendered.html,
         searchText: rendered.searchText,
         excerpt: rendered.excerpt,
+        visibility: rendered.visibility,
         seoTitle: rendered.title,
         seoDescription: rendered.excerpt,
         createdAt: new Date(rendered.createdAt),
@@ -134,6 +136,7 @@ export class PostgresContentRepository implements ContentRepository {
       ...post,
       title: input.title.trim() || post.title,
       markdown: input.markdown,
+      visibility: input.visibility ?? post.visibility,
       updatedAt: new Date().toISOString()
     });
 
@@ -146,6 +149,7 @@ export class PostgresContentRepository implements ContentRepository {
         contentHtml: rendered.html,
         searchText: rendered.searchText,
         excerpt: rendered.excerpt,
+        visibility: rendered.visibility,
         seoTitle: rendered.title,
         seoDescription: rendered.excerpt,
         updatedAt: new Date(rendered.updatedAt)
@@ -583,6 +587,7 @@ function mapPostRow(row: PostRow): StoredPost {
     slug: row.slug,
     title: row.title,
     markdown: row.contentMarkdown ?? "",
+    visibility: row.visibility === "private" ? "private" : "public",
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
     viewCount: row.viewCount,

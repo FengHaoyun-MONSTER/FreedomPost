@@ -29,6 +29,7 @@ type AdminPost = {
   viewCount: number;
   commentCount: number;
   attachmentCount: number;
+  visibility: "public" | "private";
 };
 
 type Toast = {
@@ -255,7 +256,8 @@ function App() {
       credentials: "include",
       body: JSON.stringify({
         title: "未命名文章",
-        markdown: "# 未命名文章\n\n开始写作。"
+        markdown: "# 未命名文章\n\n开始写作。",
+        visibility: "public"
       })
     });
 
@@ -277,7 +279,7 @@ function App() {
       method: "PUT",
       headers: { "content-type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ title: activePost.title, markdown })
+      body: JSON.stringify({ title: activePost.title, markdown, visibility: activePost.visibility })
     });
 
     if (!response.ok) {
@@ -287,7 +289,7 @@ function App() {
 
     const saved = (await response.json()) as AdminPost;
     setPosts((items) => items.map((item) => (item.id === saved.id ? saved : item)));
-    showToast("保存成功，已公开");
+    showToast(saved.visibility === "private" ? "保存成功，仅自己可见" : "保存成功，文章已公开");
   }
 
   async function deletePost() {
@@ -588,6 +590,13 @@ function App() {
               <label className="title-field">
                 <span>标题</span>
                 <input value={activePost.title} onChange={(event) => patchActivePost({ title: event.target.value })} />
+              </label>
+              <label className="post-visibility-field">
+                <span>文章可见性</span>
+                <select value={activePost.visibility} onChange={(event) => patchActivePost({ visibility: event.target.value as AdminPost["visibility"] })}>
+                  <option value="public">公开，所有人可见</option>
+                  <option value="private">私密，仅自己可见</option>
+                </select>
               </label>
               <div
                 ref={editorRef}

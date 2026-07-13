@@ -48,9 +48,7 @@ const bootGuardScript = `(() => {
   } catch {
     requestedSlug = "";
   }
-  if (requestedSlug && requestedSlug !== initialSlug) {
-    document.documentElement.classList.add("article-boot-pending");
-  }
+  document.documentElement.classList.add("article-boot-pending");
 })();`;
 ---
 

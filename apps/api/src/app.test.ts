@@ -37,6 +37,54 @@ describe("api app", () => {
     expect(second.json().counted).toBe(false);
   });
 
+  it("keeps private posts out of every public article endpoint", async () => {
+    const repository = new MemoryContentRepository([
+      testPost({ id: "post-private", slug: "private", title: "私密文章", markdown: "secret", visibility: "private" }),
+      testPost({ id: "post-public", slug: "public", title: "公开文章", markdown: "hello" })
+    ]);
+    const app = buildApp({ repository });
+
+    const list = await app.inject({ method: "GET", url: "/api/posts" });
+    const detail = await app.inject({ method: "GET", url: "/api/posts/private" });
+    const search = await app.inject({ method: "GET", url: "/api/search-index" });
+    const comments = await app.inject({ method: "GET", url: "/api/posts/private/comments" });
+    const view = await app.inject({ method: "POST", url: "/api/posts/private/view", payload: { localId: "private-device" } });
+    await app.close();
+
+    expect(list.json().items.map((item: { slug: string }) => item.slug)).toEqual(["public"]);
+    expect(detail.statusCode).toBe(404);
+    expect(search.json().documents.map((item: { slug: string }) => item.slug)).toEqual(["public"]);
+    expect(comments.statusCode).toBe(404);
+    expect(view.statusCode).toBe(404);
+  });
+
+  it("allows admins to create and switch private posts", async () => {
+    const app = buildApp({ repository: new MemoryContentRepository() });
+    const cookie = await adminCookie(app);
+    const created = await app.inject({
+      method: "POST",
+      url: "/api/admin/posts",
+      headers: { cookie },
+      payload: { title: "仅自己可见", markdown: "secret", visibility: "private" }
+    });
+    const publicList = await app.inject({ method: "GET", url: "/api/posts" });
+    const adminList = await app.inject({ method: "GET", url: "/api/admin/posts", headers: { cookie } });
+    const switched = await app.inject({
+      method: "PUT",
+      url: `/api/admin/posts/${created.json().id}`,
+      headers: { cookie },
+      payload: { visibility: "public" }
+    });
+    await app.close();
+
+    expect(created.statusCode).toBe(201);
+    expect(created.json().visibility).toBe("private");
+    expect(publicList.json().items.some((item: { slug: string }) => item.slug === created.json().slug)).toBe(false);
+    expect(adminList.json().items.some((item: { id: string }) => item.id === created.json().id)).toBe(true);
+    expect(switched.statusCode).toBe(200);
+    expect(switched.json().visibility).toBe("public");
+  });
+
   it("returns saved comment attachment metadata", async () => {
     const app = buildApp({ repository: new MemoryContentRepository() });
     const attachment = {
@@ -481,11 +529,12 @@ async function fileExists(target: string): Promise<boolean> {
     .catch(() => false);
 }
 
-function testPost(input: { id: string; slug: string; title: string; markdown: string }) {
+function testPost(input: { id: string; slug: string; title: string; markdown: string; visibility?: "public" | "private" }) {
   return renderStoredPost({
     ...input,
     createdAt: "2026-07-05T00:00:00.000Z",
     updatedAt: "2026-07-05T00:00:00.000Z",
+    visibility: input.visibility ?? "public",
     viewCount: 0,
     commentCount: 0,
     attachmentCount: 0
