@@ -87,6 +87,7 @@ let searchInput = document.querySelector<HTMLInputElement>("#portalSearchInput")
 let searchMeta = document.querySelector<HTMLElement>("#articleSearchMeta");
 let emptyState = document.querySelector<HTMLElement>("#emptyArticles");
 let routeLoading = false;
+let portalToastTimer = 0;
 
 let posts: PostListItem[] = [];
 let searchDocuments: SearchDocument[] = [];
@@ -428,12 +429,8 @@ function renderProductDialog(product: StoreProduct) {
 }
 
 function bindProductDialogActions(product: StoreProduct, productDialog: HTMLDialogElement, orderDialog: HTMLDialogElement, content: HTMLElement) {
-  productDialog.querySelector<HTMLButtonElement>("[data-share-product]")?.addEventListener("click", () => {
-    const destination = new URL("/earn/", location.origin);
-    destination.searchParams.set("product", product.slug);
-    addLockedReferral(destination);
-    productDialog.close();
-    void loadRoute(destination, true);
+  productDialog.querySelector<HTMLButtonElement>("[data-share-product]")?.addEventListener("click", (event) => {
+    void shareMarketProduct(product, productDialog, event.currentTarget as HTMLButtonElement);
   });
   productDialog.querySelector<HTMLButtonElement>("[data-order-product]")?.addEventListener("click", () => {
     const ref = lockedReferral();
@@ -443,6 +440,41 @@ function bindProductDialogActions(product: StoreProduct, productDialog: HTMLDial
     orderDialog.showModal();
     content.querySelector<HTMLFormElement>("#affiliateOrderForm")?.addEventListener("submit", (event) => void submitAffiliateOrder(event, product, content));
   });
+}
+
+async function shareMarketProduct(product: StoreProduct, productDialog: HTMLDialogElement, button: HTMLButtonElement) {
+  button.disabled = true;
+  try {
+    const response = await fetch("/api/affiliate/dashboard", { headers: { Accept: "application/json" } });
+    if (response.ok) {
+      const result = await response.json() as { shareUrl: string };
+      const shareUrl = new URL(result.shareUrl);
+      shareUrl.searchParams.set("product", product.slug);
+      await copyTextToClipboard(shareUrl.toString());
+      productDialog.close();
+      showPortalToast("分享链接复制成功", { center: true, success: true, duration: 2000 });
+      return;
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      const destination = new URL("/earn/", location.origin);
+      destination.searchParams.set("product", product.slug);
+      addLockedReferral(destination);
+      productDialog.close();
+      await loadRoute(destination, true);
+      return;
+    }
+    throw new Error("Affiliate session check failed");
+  } catch {
+    showPortalToast("分享链接复制失败，请稍后重试", { center: true, duration: 2000 });
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function copyTextToClipboard(value: string) {
+  if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+  await navigator.clipboard.writeText(value);
 }
 
 async function submitAffiliateOrder(event: SubmitEvent, product: StoreProduct, content: HTMLElement) {
@@ -722,16 +754,17 @@ function commissionStatusLabel(status: AffiliateOrder["commissionStatus"]) {
   return ({ not_due: "无需结算", pending: "待支付", paid: "已支付" } as const)[status];
 }
 
-function showPortalToast(message: string) {
+function showPortalToast(message: string, options: { center?: boolean; success?: boolean; duration?: number } = {}) {
   const toast = document.querySelector<HTMLElement>("#portalToast");
   if (!toast) return;
+  window.clearTimeout(portalToastTimer);
   toast.textContent = message;
-  toast.style.opacity = "1";
-  toast.style.transform = "translateY(0)";
-  window.setTimeout(() => {
-    toast.style.opacity = "0";
-    toast.style.transform = "translateY(8px)";
-  }, 1800);
+  toast.classList.toggle("portal-toast-center", options.center === true);
+  toast.classList.toggle("portal-toast-success", options.success === true);
+  toast.classList.add("is-visible");
+  portalToastTimer = window.setTimeout(() => {
+    toast.classList.remove("is-visible");
+  }, options.duration ?? 1800);
 }
 
 function createPortalIcons() {
