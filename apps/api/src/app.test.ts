@@ -180,6 +180,13 @@ describe("api app", () => {
     const generatedPassword = access.json().generatedPassword as string;
     const affiliateCookie = access.cookies.find((cookie) => cookie.name === "fp_affiliate_session");
 
+    const markup = await app.inject({
+      method: "PATCH",
+      url: "/api/affiliate/markups",
+      headers: { cookie: `fp_affiliate_session=${affiliateCookie?.value}` },
+      payload: { markupPercent: 20, productIds: null }
+    });
+
     const click = await app.inject({
       method: "POST",
       url: "/api/affiliate/clicks",
@@ -206,7 +213,9 @@ describe("api app", () => {
     expect(generatedPassword).toHaveLength(10);
     expect(click.json()).toMatchObject({ accepted: true, isUnique: true });
     expect(order.statusCode).toBe(201);
-    expect(order.json().order).toMatchObject({ priceCents: 19900, commissionCents: 2500, orderStatus: "pending", commissionStatus: "not_due" });
+    expect(markup.statusCode).toBe(200);
+    expect(markup.json().items[0]).toMatchObject({ markupPercent: 20, customerPriceCents: 23880, commissionCents: 3980 });
+    expect(order.json().order).toMatchObject({ priceCents: 23880, commissionCents: 3980, orderStatus: "pending", commissionStatus: "not_due" });
     expect(dashboard.json().dashboard).toMatchObject({ totalClicks: 1, uniqueClicks: 1, completedOrders: 0 });
     expect(wrongPassword.statusCode).toBe(401);
   });
@@ -226,7 +235,7 @@ describe("api app", () => {
     await app.close();
 
     expect(updated.statusCode).toBe(200);
-    expect(updated.json()).toMatchObject({ orderStatus: "completed", commissionStatus: "pending", commissionCents: 600 });
+    expect(updated.json()).toMatchObject({ orderStatus: "completed", commissionStatus: "pending", commissionCents: 0 });
   });
 
   it("extracts managed OSS asset keys without touching external links", () => {

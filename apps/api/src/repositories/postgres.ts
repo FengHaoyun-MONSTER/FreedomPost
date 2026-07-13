@@ -5,6 +5,7 @@ import {
   attachments as attachmentsTable,
   affiliateClicks as affiliateClicksTable,
   affiliateOrders as affiliateOrdersTable,
+  affiliateProductMarkups as affiliateProductMarkupsTable,
   affiliates as affiliatesTable,
   comments as commentsTable,
   postViews as postViewsTable,
@@ -31,6 +32,7 @@ import type {
   ProductInput,
   StoredTool,
   ToolInput,
+  AffiliateProductView,
   RecordViewInput,
   RecordViewResult,
   StoredPost,
@@ -428,6 +430,31 @@ export class PostgresContentRepository implements ContentRepository {
     return rows.length > 0;
   }
 
+  async listAffiliateProducts(affiliateId: string): Promise<AffiliateProductView[]> {
+    const affiliate = await this.db.select({ defaultMarkupPercent: affiliatesTable.defaultMarkupPercent }).from(affiliatesTable).where(eq(affiliatesTable.id, affiliateId)).limit(1);
+    if (!affiliate[0]) return [];
+    const defaultMarkupPercent = affiliate[0].defaultMarkupPercent;
+    const [products, overrides] = await Promise.all([
+      this.listProducts({ publishedOnly: true }),
+      this.db.select().from(affiliateProductMarkupsTable).where(eq(affiliateProductMarkupsTable.affiliateId, affiliateId))
+    ]);
+    const overrideMap = new Map(overrides.map((item) => [item.productId, item.markupPercent]));
+    return products.map((product) => withAffiliatePrice(product, overrideMap.get(product.id) ?? defaultMarkupPercent));
+  }
+
+  async setAffiliateMarkup(affiliateId: string, productIds: string[] | null, markupPercent: number): Promise<void> {
+    if (productIds === null) {
+      await this.db.delete(affiliateProductMarkupsTable).where(eq(affiliateProductMarkupsTable.affiliateId, affiliateId));
+      await this.db.update(affiliatesTable).set({ defaultMarkupPercent: markupPercent, updatedAt: new Date() }).where(eq(affiliatesTable.id, affiliateId));
+      return;
+    }
+    if (productIds.length === 0) return;
+    await this.db.insert(affiliateProductMarkupsTable).values(productIds.map((productId) => ({ affiliateId, productId, markupPercent, updatedAt: new Date() }))).onConflictDoUpdate({
+      target: [affiliateProductMarkupsTable.affiliateId, affiliateProductMarkupsTable.productId],
+      set: { markupPercent, updatedAt: new Date() }
+    });
+  }
+
   async recordAffiliateClick(wechatId: string, visitorKey: string, path: string) {
     const affiliate = await this.getAffiliateByWechatId(wechatId);
     if (!affiliate || affiliate.status !== "active") return { accepted: false, isUnique: false };
@@ -465,14 +492,14 @@ export class PostgresContentRepository implements ContentRepository {
     return dashboardFrom(publicAffiliate(mapAffiliateRow(affiliateRow)), clicks ?? { totalClicks: 0, uniqueClicks: 0 }, orders);
   }
 
-  async createAffiliateOrder(affiliateId: string, product: StoredProduct): Promise<StoredAffiliateOrder> {
+  async createAffiliateOrder(affiliateId: string, product: StoredProduct, priceCents: number, commissionCents: number): Promise<StoredAffiliateOrder> {
     const [row] = await this.db.insert(affiliateOrdersTable).values({
       orderCode: await this.uniqueOrderCode(),
       affiliateId,
       productId: product.id,
       productTitle: product.title,
-      priceCents: product.priceCents,
-      commissionCents: product.commissionCents,
+      priceCents,
+      commissionCents,
       currency: product.currency
     }).returning();
     if (!row) throw new Error("Failed to create affiliate order");
@@ -608,10 +635,16 @@ function mapAffiliateRow(row: AffiliateRow): StoredAffiliate {
     id: row.id,
     wechatId: row.wechatId,
     passwordHash: row.passwordHash,
+    defaultMarkupPercent: row.defaultMarkupPercent,
     status: row.status === "disabled" ? "disabled" : "active",
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt)
   };
+}
+
+function withAffiliatePrice(product: StoredProduct, markupPercent: number): AffiliateProductView {
+  const customerPriceCents = Math.round(product.priceCents * (100 + markupPercent) / 100);
+  return { ...product, markupPercent, customerPriceCents, commissionCents: customerPriceCents - product.priceCents };
 }
 
 function publicAffiliate(affiliate: StoredAffiliate): Omit<StoredAffiliate, "passwordHash"> {

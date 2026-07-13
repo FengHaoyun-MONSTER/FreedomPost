@@ -82,14 +82,27 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     items: await repository.listPostSummaries()
   }));
 
-  app.get("/api/products", async () => ({
-    items: await repository.listProducts({ publishedOnly: true })
-  }));
+  app.get<{ Querystring: { ref?: string } }>("/api/products", async (request) => {
+    const affiliate = normalizeWechatId(request.query.ref);
+    if (affiliate) {
+      const affiliateRecord = await repository.getAffiliateByWechatId(affiliate);
+      if (affiliateRecord?.status === "active") return { items: await repository.listAffiliateProducts(affiliateRecord.id) };
+    }
+    return { items: await repository.listProducts({ publishedOnly: true }) };
+  });
 
-  app.get<{ Params: { slug: string } }>("/api/products/:slug", async (request, reply) => {
+  app.get<{ Params: { slug: string }; Querystring: { ref?: string } }>("/api/products/:slug", async (request, reply) => {
     const product = await repository.getProductBySlug(request.params.slug);
     if (!product || product.status !== "published") {
       return reply.code(404).send(errorBody("PRODUCT_NOT_FOUND", "商品不存在或尚未发布"));
+    }
+    const affiliate = normalizeWechatId(request.query.ref);
+    if (affiliate) {
+      const affiliateRecord = await repository.getAffiliateByWechatId(affiliate);
+      const priced = affiliateRecord?.status === "active"
+        ? (await repository.listAffiliateProducts(affiliateRecord.id)).find((item) => item.id === product.id)
+        : null;
+      if (priced) return { item: priced };
     }
     return { item: product };
   });
@@ -147,6 +160,28 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     return { shareUrl: affiliateShareUrl(session.wechatId), dashboard };
   });
 
+  app.get("/api/affiliate/catalog", async (request, reply) => {
+    const session = getAffiliateSession(request.cookies.fp_affiliate_session);
+    if (!session) return reply.code(401).send(errorBody("UNAUTHENTICATED", "请使用微信号和查询密码进入"));
+    return { items: await repository.listAffiliateProducts(session.affiliateId) };
+  });
+
+  app.patch<{ Body: unknown }>("/api/affiliate/markups", async (request, reply) => {
+    const session = getAffiliateSession(request.cookies.fp_affiliate_session);
+    if (!session) return reply.code(401).send(errorBody("UNAUTHENTICATED", "请使用微信号和查询密码进入"));
+    const body = request.body as Record<string, unknown> | null;
+    const markupPercent = readInteger(body?.markupPercent, 0, 1000);
+    const rawProductIds = body?.productIds;
+    const productIds = rawProductIds === undefined || rawProductIds === null
+      ? null
+      : Array.isArray(rawProductIds) && rawProductIds.every((value) => typeof value === "string")
+        ? rawProductIds.slice(0, 100) as string[]
+        : undefined;
+    if (markupPercent === null || productIds === undefined) return reply.code(400).send(errorBody("INVALID_MARKUP", "加价比例或商品选择不正确"));
+    await repository.setAffiliateMarkup(session.affiliateId, productIds, markupPercent);
+    return { items: await repository.listAffiliateProducts(session.affiliateId) };
+  });
+
   app.post("/api/affiliate/logout", async (request, reply) => {
     const token = request.cookies.fp_affiliate_session;
     if (token) affiliateSessions.delete(sha256(token));
@@ -188,7 +223,9 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     if (!affiliate || affiliate.status !== "active") {
       return reply.code(400).send(errorBody("INVALID_RECOMMENDER", "推荐人微信号不存在或已停用"));
     }
-    const order = await repository.createAffiliateOrder(affiliate.id, product);
+    const pricing = (await repository.listAffiliateProducts(affiliate.id)).find((item) => item.id === product.id);
+    if (!pricing) return reply.code(404).send(errorBody("PRODUCT_UNAVAILABLE", "商品不存在或暂时无法下单"));
+    const order = await repository.createAffiliateOrder(affiliate.id, product, pricing.customerPriceCents, pricing.commissionCents);
     return reply.code(201).send({ order });
   });
 

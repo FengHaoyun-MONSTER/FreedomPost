@@ -26,6 +26,7 @@ type StoreProduct = {
   category: string;
   priceCents: number;
   commissionCents: number;
+  customerPriceCents?: number;
   compareAtCents: number | null;
   currency: string;
   stock: number;
@@ -59,13 +60,18 @@ type AffiliateOrder = {
 };
 
 type AffiliateDashboard = {
-  affiliate: { wechatId: string };
+  affiliate: { wechatId: string; defaultMarkupPercent?: number };
   totalClicks: number;
   uniqueClicks: number;
   completedOrders: number;
   pendingCommissionCents: number;
   paidCommissionCents: number;
   orders: AffiliateOrder[];
+};
+
+type AffiliateProduct = StoreProduct & {
+  markupPercent: number;
+  customerPriceCents: number;
 };
 
 const themeKey = "fp_theme_v1";
@@ -315,7 +321,10 @@ async function hydrateMarket() {
   });
 
   try {
-    const response = await fetch("/api/products", { headers: { Accept: "application/json" } });
+    const productUrl = new URL("/api/products", location.origin);
+    const ref = lockedReferral();
+    if (ref) productUrl.searchParams.set("ref", ref);
+    const response = await fetch(productUrl, { headers: { Accept: "application/json" } });
     if (!response.ok) throw new Error("products unavailable");
     products = ((await response.json()) as { items: StoreProduct[] }).items;
     render();
@@ -392,6 +401,7 @@ async function shareTool(tool: CreatorTool) {
 }
 
 function renderMarketProduct(product: StoreProduct) {
+  const displayPrice = product.customerPriceCents ?? product.priceCents;
   const availability = product.stock === 0 ? `已售出 ${product.soldCount} · 暂时售罄` : product.stock < 0 ? `已售出 ${product.soldCount} · 不限量` : `已售出 ${product.soldCount} · 库存 ${product.stock}`;
   const cover = product.coverUrl
     ? `<img src="${escapeAttribute(product.coverUrl)}" alt="${escapeAttribute(product.title)}" />`
@@ -403,17 +413,18 @@ function renderMarketProduct(product: StoreProduct) {
       <span class="market-product-category">${escapeHtml(productCategoryLabel(product.category))}</span>
       <h2>${escapeHtml(product.title)}</h2>
       <p>${escapeHtml(product.summary)}</p>
-      <div class="market-product-bottom"><div class="market-product-price"><strong>${formatCurrency(product.priceCents, product.currency)}</strong>${compareAt}</div><span>${availability}</span></div>
+    <div class="market-product-bottom"><div class="market-product-price"><strong>${formatCurrency(displayPrice, product.currency)}</strong>${compareAt}</div><span>${availability}</span></div>
       <button type="button" data-product-slug="${escapeAttribute(product.slug)}">查看详情 <i data-lucide="arrow-up-right"></i></button>
     </div>
   </article>`;
 }
 
 function renderProductDialog(product: StoreProduct) {
+  const displayPrice = product.customerPriceCents ?? product.priceCents;
   const cover = product.coverUrl ? `<img src="${escapeAttribute(product.coverUrl)}" alt="${escapeAttribute(product.title)}" />` : "";
   const availability = product.stock === 0 ? `已售出 ${product.soldCount} · 暂时售罄` : product.stock < 0 ? `已售出 ${product.soldCount} · 不限量供应` : `已售出 ${product.soldCount} · 当前库存 ${product.stock}`;
   const commission = product.commissionCents > 0 ? ` · 可得 ${formatCurrency(product.commissionCents, product.currency)}` : "";
-  return `<div class="product-dialog-cover">${cover}</div><p class="section-kicker">${escapeHtml(productCategoryLabel(product.category))}</p><h2>${escapeHtml(product.title)}</h2><p class="product-dialog-summary">${escapeHtml(product.summary)}</p><div class="product-dialog-price">${formatCurrency(product.priceCents, product.currency)} <span>${availability}</span></div><div class="product-dialog-description">${escapeHtml(product.description).replace(/\n/g, "<br>")}</div><div class="product-dialog-actions"><button class="button secondary" type="button" data-share-product>分享此商品赚钱${escapeHtml(commission)}</button><button class="button primary" type="button" data-order-product ${product.stock === 0 ? "disabled" : ""}>立即下单</button></div>`;
+  return `<div class="product-dialog-cover">${cover}</div><p class="section-kicker">${escapeHtml(productCategoryLabel(product.category))}</p><h2>${escapeHtml(product.title)}</h2><p class="product-dialog-summary">${escapeHtml(product.summary)}</p><div class="product-dialog-price">${formatCurrency(displayPrice, product.currency)} <span>${availability}</span></div><div class="product-dialog-description">${escapeHtml(product.description).replace(/\n/g, "<br>")}</div><div class="product-dialog-actions"><button class="button secondary" type="button" data-share-product>分享此商品赚钱${escapeHtml(commission)}</button><button class="button primary" type="button" data-order-product ${product.stock === 0 ? "disabled" : ""}>立即下单</button></div>`;
 }
 
 function bindProductDialogActions(product: StoreProduct, productDialog: HTMLDialogElement, orderDialog: HTMLDialogElement, content: HTMLElement) {
@@ -426,7 +437,8 @@ function bindProductDialogActions(product: StoreProduct, productDialog: HTMLDial
   });
   productDialog.querySelector<HTMLButtonElement>("[data-order-product]")?.addEventListener("click", () => {
     const ref = lockedReferral();
-    content.innerHTML = `<p class="section-kicker">Order</p><h2>提交下单信息</h2><p class="product-dialog-summary">${escapeHtml(product.title)} · ${formatCurrency(product.priceCents, product.currency)}</p><form id="affiliateOrderForm" class="order-form"><label><span>推荐人微信号</span><input name="recommenderWechatId" maxlength="32" required value="${escapeAttribute(ref ?? "")}" ${ref ? "readonly" : ""} placeholder="填写推荐人的微信号" /></label><p>提交后会生成订单号，请添加客服微信或 QQ 完成人工交易。</p><button class="button primary" type="submit">生成订单号</button><p class="form-error" role="alert" hidden></p></form>`;
+    const displayPrice = product.customerPriceCents ?? product.priceCents;
+    content.innerHTML = `<p class="section-kicker">Order</p><h2>提交下单信息</h2><p class="product-dialog-summary">${escapeHtml(product.title)} · ${formatCurrency(displayPrice, product.currency)}</p><form id="affiliateOrderForm" class="order-form"><label><span>推荐人微信号</span><input name="recommenderWechatId" maxlength="32" required value="${escapeAttribute(ref ?? "")}" ${ref ? "readonly" : ""} placeholder="填写推荐人的微信号" /></label><p>提交后会生成订单号，请添加客服微信或 QQ 完成人工交易。</p><button class="button primary" type="submit">生成订单号</button><p class="form-error" role="alert" hidden></p></form>`;
     productDialog.close();
     orderDialog.showModal();
     content.querySelector<HTMLFormElement>("#affiliateOrderForm")?.addEventListener("submit", (event) => void submitAffiliateOrder(event, product, content));
@@ -476,7 +488,10 @@ async function hydrateAffiliateDashboard() {
   });
   try {
     const response = await fetch("/api/affiliate/dashboard", { headers: { Accept: "application/json" } });
-    if (response.ok) renderAffiliateDashboard(await response.json() as { shareUrl: string; dashboard: AffiliateDashboard }, form, dashboard);
+    if (response.ok) {
+      renderAffiliateDashboard(await response.json() as { shareUrl: string; dashboard: AffiliateDashboard }, form, dashboard);
+      void hydrateAffiliatePricing();
+    }
   } catch {
     // Anonymous visitors stay on the access form.
   }
@@ -498,6 +513,7 @@ async function accessAffiliateDashboard(event: SubmitEvent, form: HTMLFormElemen
     const result = await response.json() as { shareUrl?: string; dashboard?: AffiliateDashboard; generatedPassword?: string; error?: { message?: string } };
     if (!response.ok || !result.dashboard || !result.shareUrl) throw new Error(result.error?.message || "查询失败");
     renderAffiliateDashboard({ shareUrl: productShareUrl(result.shareUrl), dashboard: result.dashboard, generatedPassword: result.generatedPassword }, form, dashboard);
+    void hydrateAffiliatePricing();
   } catch (reason) {
     if (error) {
       error.textContent = reason instanceof Error ? reason.message : "查询失败，请稍后再试";
@@ -530,7 +546,41 @@ function renderAffiliateDashboard(result: { shareUrl: string; dashboard: Affilia
   if (orders) orders.innerHTML = result.dashboard.orders.length
     ? result.dashboard.orders.map(renderAffiliateOrder).join("")
     : `<p class="affiliate-no-orders">暂无订单记录</p>`;
+  const defaultMarkup = document.querySelector<HTMLInputElement>("#affiliateDefaultMarkup");
+  if (defaultMarkup && result.dashboard.affiliate.defaultMarkupPercent !== undefined) defaultMarkup.value = String(result.dashboard.affiliate.defaultMarkupPercent);
   createPortalIcons();
+}
+
+async function hydrateAffiliatePricing() {
+  const list = document.querySelector<HTMLElement>("#affiliateProductPricing");
+  if (!list) return;
+  const response = await fetch("/api/affiliate/catalog", { headers: { Accept: "application/json" } });
+  if (!response.ok) return;
+  const items = ((await response.json()) as { items: AffiliateProduct[] }).items;
+  list.innerHTML = items.length
+    ? items.map((item) => `<label class="affiliate-product-price-row"><input type="checkbox" data-pricing-product="${escapeAttribute(item.id)}" /><span><strong>${escapeHtml(item.title)}</strong><small>管理员价 ${formatCurrency(item.priceCents, item.currency)} · 专属价 ${formatCurrency(item.customerPriceCents, item.currency)}</small></span><b>${item.markupPercent}%</b></label>`).join("")
+    : `<p class="affiliate-no-orders">暂无已发布商品</p>`;
+  document.querySelector<HTMLButtonElement>("#applyAffiliateDefault")?.addEventListener("click", () => void applyAffiliateMarkup(null));
+  document.querySelector<HTMLButtonElement>("#applyAffiliateSelected")?.addEventListener("click", () => {
+    const ids = [...list.querySelectorAll<HTMLInputElement>("[data-pricing-product]:checked")].map((input) => input.dataset.pricingProduct).filter((id): id is string => Boolean(id));
+    void applyAffiliateMarkup(ids);
+  });
+}
+
+async function applyAffiliateMarkup(productIds: string[] | null) {
+  const input = document.querySelector<HTMLInputElement>(productIds === null ? "#affiliateDefaultMarkup" : "#affiliateSelectedMarkup");
+  const markupPercent = Number(input?.value ?? 0);
+  if (!Number.isInteger(markupPercent) || markupPercent < 0 || markupPercent > 1000) {
+    showPortalToast("加价比例需在 0% 到 1000% 之间");
+    return;
+  }
+  const response = await fetch("/api/affiliate/markups", { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ markupPercent, productIds }) });
+  if (!response.ok) {
+    showPortalToast("专属价格保存失败");
+    return;
+  }
+  showPortalToast("专属价格已更新");
+  await hydrateAffiliatePricing();
 }
 
 function renderAffiliateOrder(order: AffiliateOrder) {

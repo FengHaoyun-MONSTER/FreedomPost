@@ -20,6 +20,7 @@ import type {
   StoredPost,
   StoredTool,
   ToolInput,
+  AffiliateProductView,
   StoredAffiliate,
   StoredAffiliateOrder,
   StoredProduct,
@@ -50,6 +51,7 @@ export class MemoryContentRepository implements ContentRepository {
   private readonly products = new Map<string, StoredProduct>();
   private readonly tools = new Map<string, StoredTool>();
   private readonly affiliates = new Map<string, StoredAffiliate>();
+  private readonly affiliateProductMarkups = new Map<string, number>();
   private readonly affiliateClicks: Array<{ affiliateId: string; visitorKey: string; clickedAt: string; isUnique: boolean }> = [];
   private readonly affiliateOrders = new Map<string, StoredAffiliateOrder>();
   private readonly commentsBySlug = new Map<string, Comment[]>();
@@ -274,7 +276,7 @@ export class MemoryContentRepository implements ContentRepository {
 
   async createAffiliate(wechatId: string, passwordHash: string): Promise<StoredAffiliate> {
     const now = new Date().toISOString();
-    const affiliate: StoredAffiliate = { id: crypto.randomUUID(), wechatId, passwordHash, status: "active", createdAt: now, updatedAt: now };
+    const affiliate: StoredAffiliate = { id: crypto.randomUUID(), wechatId, passwordHash, defaultMarkupPercent: 0, status: "active", createdAt: now, updatedAt: now };
     this.affiliates.set(affiliate.id, affiliate);
     return affiliate;
   }
@@ -300,6 +302,27 @@ export class MemoryContentRepository implements ContentRepository {
     if (!affiliate) return false;
     this.affiliates.set(id, { ...affiliate, passwordHash, updatedAt: new Date().toISOString() });
     return true;
+  }
+
+  async listAffiliateProducts(affiliateId: string): Promise<AffiliateProductView[]> {
+    const affiliate = this.affiliates.get(affiliateId);
+    if (!affiliate) return [];
+    return (await this.listProducts({ publishedOnly: true })).map((product) => {
+      const markupPercent = this.affiliateProductMarkups.get(`${affiliateId}:${product.id}`) ?? affiliate.defaultMarkupPercent;
+      const customerPriceCents = Math.round(product.priceCents * (100 + markupPercent) / 100);
+      return { ...product, markupPercent, customerPriceCents, commissionCents: customerPriceCents - product.priceCents };
+    });
+  }
+
+  async setAffiliateMarkup(affiliateId: string, productIds: string[] | null, markupPercent: number): Promise<void> {
+    const affiliate = this.affiliates.get(affiliateId);
+    if (!affiliate) return;
+    if (productIds === null) {
+      for (const key of this.affiliateProductMarkups.keys()) if (key.startsWith(`${affiliateId}:`)) this.affiliateProductMarkups.delete(key);
+      this.affiliates.set(affiliateId, { ...affiliate, defaultMarkupPercent: markupPercent, updatedAt: new Date().toISOString() });
+      return;
+    }
+    productIds.forEach((productId) => this.affiliateProductMarkups.set(`${affiliateId}:${productId}`, markupPercent));
   }
 
   async recordAffiliateClick(wechatId: string, visitorKey: string, _path: string) {
@@ -328,7 +351,7 @@ export class MemoryContentRepository implements ContentRepository {
     };
   }
 
-  async createAffiliateOrder(affiliateId: string, product: StoredProduct): Promise<StoredAffiliateOrder> {
+  async createAffiliateOrder(affiliateId: string, product: StoredProduct, priceCents: number, commissionCents: number): Promise<StoredAffiliateOrder> {
     const affiliate = this.affiliates.get(affiliateId);
     if (!affiliate) throw new Error("Affiliate not found");
     const now = new Date().toISOString();
@@ -339,8 +362,8 @@ export class MemoryContentRepository implements ContentRepository {
       affiliateWechatId: affiliate.wechatId,
       productId: product.id,
       productTitle: product.title,
-      priceCents: product.priceCents,
-      commissionCents: product.commissionCents,
+      priceCents,
+      commissionCents,
       currency: product.currency,
       orderStatus: "pending",
       commissionStatus: "not_due",

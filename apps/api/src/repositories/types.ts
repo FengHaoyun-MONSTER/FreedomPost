@@ -89,6 +89,7 @@ export interface StoredAffiliate {
   id: string;
   wechatId: string;
   passwordHash: string;
+  defaultMarkupPercent: number;
   status: AffiliateStatus;
   createdAt: string;
   updatedAt: string;
@@ -120,6 +121,12 @@ export interface AffiliateDashboard {
   pendingCommissionCents: number;
   paidCommissionCents: number;
   orders: StoredAffiliateOrder[];
+}
+
+export interface AffiliateProductView extends StoredProduct {
+  markupPercent: number;
+  customerPriceCents: number;
+  commissionCents: number;
 }
 
 export interface CreatePostInput {
@@ -187,9 +194,11 @@ export interface ContentRepository {
   listAffiliates(): Promise<Array<Omit<StoredAffiliate, "passwordHash"> & { totalClicks: number; uniqueClicks: number; orderCount: number }>>;
   updateAffiliateStatus(id: string, status: AffiliateStatus): Promise<boolean>;
   updateAffiliatePassword(id: string, passwordHash: string): Promise<boolean>;
+  listAffiliateProducts(affiliateId: string): Promise<AffiliateProductView[]>;
+  setAffiliateMarkup(affiliateId: string, productIds: string[] | null, markupPercent: number): Promise<void>;
   recordAffiliateClick(wechatId: string, visitorKey: string, path: string): Promise<{ accepted: boolean; isUnique: boolean }>;
   getAffiliateDashboard(affiliateId: string): Promise<AffiliateDashboard | null>;
-  createAffiliateOrder(affiliateId: string, product: StoredProduct): Promise<StoredAffiliateOrder>;
+  createAffiliateOrder(affiliateId: string, product: StoredProduct, priceCents: number, commissionCents: number): Promise<StoredAffiliateOrder>;
   listAffiliateOrders(): Promise<StoredAffiliateOrder[]>;
   updateAffiliateOrder(id: string, orderStatus: AffiliateOrderStatus, commissionStatus: AffiliateCommissionStatus): Promise<StoredAffiliateOrder | null>;
 }

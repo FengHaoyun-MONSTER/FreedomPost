@@ -5,6 +5,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -93,12 +94,32 @@ export const affiliates = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     wechatId: varchar("wechat_id", { length: 32 }).notNull().unique(),
     passwordHash: text("password_hash").notNull(),
+    defaultMarkupPercent: integer("default_markup_percent").notNull().default(0),
     status: varchar("status", { length: 16 }).notNull().default("active"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
   },
   (table) => ({
     statusIdx: index("idx_affiliates_status").on(table.status)
+  })
+);
+
+export const affiliateProductMarkups = pgTable(
+  "affiliate_product_markups",
+  {
+    affiliateId: uuid("affiliate_id")
+      .notNull()
+      .references(() => affiliates.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    markupPercent: integer("markup_percent").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    primaryKey: primaryKey({ columns: [table.affiliateId, table.productId] }),
+    affiliateIdx: index("idx_affiliate_product_markups_affiliate").on(table.affiliateId),
+    productIdx: index("idx_affiliate_product_markups_product").on(table.productId)
   })
 );
 

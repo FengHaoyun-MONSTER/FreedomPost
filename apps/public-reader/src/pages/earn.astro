@@ -39,6 +39,12 @@ import PortalShell from "../layouts/PortalShell.astro";
             <label for="affiliateShareUrl">赚钱专属链接</label>
             <div><input id="affiliateShareUrl" readonly /><button id="copyAffiliateLink" class="button primary" type="button"><i data-lucide="copy"></i>复制分享</button></div>
           </div>
+          <section class="affiliate-pricing-panel">
+            <div class="affiliate-pricing-head"><div><h3>专属价格</h3><p>在管理员价格基础上加价，差额就是你的收益。</p></div><span>最高 1000%</span></div>
+            <div class="affiliate-pricing-actions"><label>全部商品统一加价 <div><input id="affiliateDefaultMarkup" type="number" min="0" max="1000" step="1" value="0" /> <b>%</b></div></label><button id="applyAffiliateDefault" class="button secondary" type="button">应用到全部商品</button></div>
+            <div class="affiliate-pricing-actions"><label>选中商品统一加价 <div><input id="affiliateSelectedMarkup" type="number" min="0" max="1000" step="1" value="0" /> <b>%</b></div></label><button id="applyAffiliateSelected" class="button secondary" type="button">应用到选中商品</button></div>
+            <div id="affiliateProductPricing" class="affiliate-product-pricing"></div>
+          </section>
           <div id="affiliateStats" class="affiliate-stats"></div>
           <div class="affiliate-orders-block"><h3>订单与结算记录</h3><div id="affiliateOrders" class="affiliate-order-list"></div></div>
         </section>

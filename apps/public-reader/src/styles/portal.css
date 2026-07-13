@@ -1484,6 +1484,111 @@ svg {
   white-space: nowrap;
 }
 
+.affiliate-pricing-panel {
+  margin-top: 26px;
+  padding-top: 24px;
+  border-top: 1px solid var(--portal-line);
+}
+
+.affiliate-pricing-head,
+.affiliate-pricing-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.affiliate-pricing-head h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.affiliate-pricing-head p {
+  margin: 3px 0 0;
+  color: var(--portal-muted);
+  font-size: 12px;
+}
+
+.affiliate-pricing-head > span {
+  color: var(--portal-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.affiliate-pricing-actions {
+  margin-top: 14px;
+}
+
+.affiliate-pricing-actions label {
+  display: grid;
+  gap: 5px;
+  color: var(--portal-muted);
+  font-size: 12px;
+}
+
+.affiliate-pricing-actions label > div {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.affiliate-pricing-actions input {
+  width: 100px;
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: 7px;
+  background: var(--portal-bg);
+  color: var(--portal-text);
+}
+
+.affiliate-pricing-actions b {
+  color: var(--portal-accent);
+}
+
+.affiliate-pricing-actions .button {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.affiliate-product-pricing {
+  margin-top: 18px;
+  border-top: 1px solid var(--portal-line);
+}
+
+.affiliate-product-price-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--portal-line);
+}
+
+.affiliate-product-price-row input {
+  accent-color: var(--portal-accent);
+}
+
+.affiliate-product-price-row strong,
+.affiliate-product-price-row small {
+  display: block;
+}
+
+.affiliate-product-price-row strong {
+  font-size: 13px;
+}
+
+.affiliate-product-price-row small {
+  margin-top: 2px;
+  color: var(--portal-muted);
+  font-size: 11px;
+}
+
+.affiliate-product-price-row b {
+  color: var(--portal-accent);
+  font-size: 13px;
+}
+
 .affiliate-stats {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -2049,6 +2154,16 @@ svg {
 
   .affiliate-panel {
     padding: 20px;
+  }
+
+  .affiliate-pricing-head,
+  .affiliate-pricing-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .affiliate-pricing-actions .button {
+    width: 100%;
   }
 
   .affiliate-stats {
