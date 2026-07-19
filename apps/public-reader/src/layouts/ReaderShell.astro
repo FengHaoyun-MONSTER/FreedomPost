@@ -1,6 +1,6 @@
 ---
 import type { TocItem } from "@freedompost/shared";
-import { createReaderBootGuardScript } from "../lib/reader-boot";
+import { readerBootPendingClass } from "../lib/reader-boot";
 import "../styles/global.css";
 
 interface ArticleViewModel {
@@ -39,11 +39,10 @@ const initialPayload = JSON.stringify({
   toc: article.toc
 });
 const canonicalUrl = new URL(`/p/${encodeURIComponent(article.slug)}`, Astro.site ?? "https://example.com").toString();
-const bootGuardScript = createReaderBootGuardScript();
 ---
 
 <!doctype html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="dark" class={readerBootPendingClass}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -54,7 +53,6 @@ const bootGuardScript = createReaderBootGuardScript();
     <meta property="og:description" content={article.excerpt} />
     <meta property="og:type" content="article" />
     <meta property="og:url" content={canonicalUrl} />
-    <script is:inline set:html={bootGuardScript}></script>
   </head>
   <body data-active-slug={article.slug}>
     <div id="app" class="app-shell">

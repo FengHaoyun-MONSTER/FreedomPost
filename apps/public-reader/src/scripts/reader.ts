@@ -5,6 +5,10 @@ import {
   readArticleSlugFromPath,
   referralStorageKey
 } from "../lib/article-links.js";
+import {
+  readerBootPendingClass,
+  releaseReaderBootGuardIfUnrequested
+} from "../lib/reader-boot.js";
 
 type TocItem = {
   id: string;
@@ -119,6 +123,7 @@ const commentDefaultPlaceholder = "写下评论或者粘贴图片或者拖入文
 const initial = readInitialPayload();
 const pathSlug = readArticleSlugFromPath(location.pathname);
 const requestedSlug = pageSearchParams.get("post")?.trim() || pathSlug || null;
+releaseReaderBootGuardIfUnrequested(document.documentElement, requestedSlug);
 let activeSlug = requestedSlug ?? initial?.slug ?? document.body.dataset.activeSlug ?? "";
 let posts: PostListItem[] = [];
 let searchDocs: SearchDocument[] = [];
@@ -314,7 +319,7 @@ async function openArticle(
   const cached = articleCache.get(slug) ?? (await prefetchArticle(slug));
   if (!cached) {
     if (requestedSlug) renderUnavailableArticle();
-    document.documentElement.classList.remove("article-boot-pending");
+    document.documentElement.classList.remove(readerBootPendingClass);
     if (location.pathname.startsWith("/p/")) location.replace("/");
     return;
   }
@@ -355,7 +360,7 @@ async function openArticle(
   }
   notifyParentArticleChange(canonicalSlug, cached.meta.title, options.push === true);
 
-  document.documentElement.classList.remove("article-boot-pending");
+  document.documentElement.classList.remove(readerBootPendingClass);
 }
 
 function renderUnavailableArticle() {
