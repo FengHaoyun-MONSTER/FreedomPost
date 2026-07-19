@@ -6,7 +6,7 @@ import {
   referralStorageKey
 } from "../lib/article-links.js";
 import {
-  readerBootPendingClass,
+  finishReaderBootGuard,
   releaseReaderBootGuardIfUnrequested
 } from "../lib/reader-boot.js";
 
@@ -123,7 +123,7 @@ const commentDefaultPlaceholder = "写下评论或者粘贴图片或者拖入文
 const initial = readInitialPayload();
 const pathSlug = readArticleSlugFromPath(location.pathname);
 const requestedSlug = pageSearchParams.get("post")?.trim() || pathSlug || null;
-releaseReaderBootGuardIfUnrequested(document.documentElement, requestedSlug);
+releaseReaderBootGuardIfUnrequested(document.documentElement, document.body, requestedSlug);
 let activeSlug = requestedSlug ?? initial?.slug ?? document.body.dataset.activeSlug ?? "";
 let posts: PostListItem[] = [];
 let searchDocs: SearchDocument[] = [];
@@ -319,7 +319,7 @@ async function openArticle(
   const cached = articleCache.get(slug) ?? (await prefetchArticle(slug));
   if (!cached) {
     if (requestedSlug) renderUnavailableArticle();
-    document.documentElement.classList.remove(readerBootPendingClass);
+    finishReaderBootGuard(document.documentElement, document.body);
     if (location.pathname.startsWith("/p/")) location.replace("/");
     return;
   }
@@ -360,7 +360,7 @@ async function openArticle(
   }
   notifyParentArticleChange(canonicalSlug, cached.meta.title, options.push === true);
 
-  document.documentElement.classList.remove(readerBootPendingClass);
+  finishReaderBootGuard(document.documentElement, document.body);
 }
 
 function renderUnavailableArticle() {

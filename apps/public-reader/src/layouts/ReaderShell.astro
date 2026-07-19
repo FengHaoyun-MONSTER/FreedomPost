@@ -1,6 +1,6 @@
 ---
 import type { TocItem } from "@freedompost/shared";
-import { readerBootPendingClass } from "../lib/reader-boot";
+import { readerBootHiddenStyle, readerBootPendingClass } from "../lib/reader-boot";
 import "../styles/global.css";
 
 interface ArticleViewModel {
@@ -54,7 +54,7 @@ const canonicalUrl = new URL(`/p/${encodeURIComponent(article.slug)}`, Astro.sit
     <meta property="og:type" content="article" />
     <meta property="og:url" content={canonicalUrl} />
   </head>
-  <body data-active-slug={article.slug}>
+  <body data-active-slug={article.slug} style={readerBootHiddenStyle}>
     <div id="app" class="app-shell">
       <aside class="article-list-panel" aria-label="文章列表">
         <div class="brand-row">

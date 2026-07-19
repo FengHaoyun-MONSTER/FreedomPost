@@ -1,26 +1,59 @@
 import { describe, expect, it } from "vitest";
-import { readerBootPendingClass, releaseReaderBootGuardIfUnrequested } from "./reader-boot.js";
+import {
+  finishReaderBootGuard,
+  readerBootHiddenStyle,
+  readerBootPendingClass,
+  releaseReaderBootGuardIfUnrequested
+} from "./reader-boot.js";
 
-function removedClasses(requestedSlug: string | null): string[] {
+function releasedState(requestedSlug: string | null): { classes: string[]; styles: string[] } {
   const removed: string[] = [];
+  const styles: string[] = [];
   releaseReaderBootGuardIfUnrequested(
     { classList: { remove: (className: string) => removed.push(className) } },
+    {
+      style: {
+        removeProperty: (propertyName: string) => {
+          styles.push(propertyName);
+          return "";
+        }
+      }
+    },
     requestedSlug
   );
-  return removed;
+  return { classes: removed, styles };
 }
 
 describe("reader boot guard", () => {
-  it("uses a stable class that can be rendered before CSP blocks inline scripts", () => {
+  it("provides CSP-safe static guards for the pre-CSS and post-CSS phases", () => {
     expect(readerBootPendingClass).toBe("article-boot-pending");
+    expect(readerBootHiddenStyle).toBe("visibility: hidden;");
   });
 
   it("keeps the static seed article hidden while a requested article loads", () => {
-    expect(removedClasses("p_Ab3dE6gH")).toEqual([]);
+    expect(releasedState("p_Ab3dE6gH")).toEqual({ classes: [], styles: [] });
   });
 
   it("reveals the seed article only when no article was requested", () => {
-    expect(removedClasses(null)).toEqual([readerBootPendingClass]);
-    expect(removedClasses("")).toEqual([readerBootPendingClass]);
+    expect(releasedState(null)).toEqual({ classes: [readerBootPendingClass], styles: ["visibility"] });
+    expect(releasedState("")).toEqual({ classes: [readerBootPendingClass], styles: ["visibility"] });
+  });
+
+  it("reveals content atomically after the requested article is rendered", () => {
+    const classes: string[] = [];
+    const styles: string[] = [];
+    finishReaderBootGuard(
+      { classList: { remove: (className: string) => classes.push(className) } },
+      {
+        style: {
+          removeProperty: (propertyName: string) => {
+            styles.push(propertyName);
+            return "";
+          }
+        }
+      }
+    );
+    expect(classes).toEqual([readerBootPendingClass]);
+    expect(styles).toEqual(["visibility"]);
   });
 });
