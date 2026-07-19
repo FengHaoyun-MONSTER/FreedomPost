@@ -313,6 +313,7 @@ async function openArticle(
 ) {
   const cached = articleCache.get(slug) ?? (await prefetchArticle(slug));
   if (!cached) {
+    if (requestedSlug) renderUnavailableArticle();
     document.documentElement.classList.remove("article-boot-pending");
     if (location.pathname.startsWith("/p/")) location.replace("/");
     return;
@@ -355,6 +356,23 @@ async function openArticle(
   notifyParentArticleChange(canonicalSlug, cached.meta.title, options.push === true);
 
   document.documentElement.classList.remove("article-boot-pending");
+}
+
+function renderUnavailableArticle() {
+  const title = "文章暂时无法加载";
+  activeSlug = "";
+  articleTitle.textContent = title;
+  articleDate.textContent = "请刷新页面后重试";
+  articleViews.textContent = "";
+  articleComments.textContent = "";
+  topArticleTitle.textContent = title;
+  topArticleDate.textContent = "";
+  topArticleViews.textContent = "";
+  topArticleComments.textContent = "";
+  articleBody.replaceChildren();
+  renderToc([]);
+  renderComments();
+  document.title = title;
 }
 
 async function prefetchArticle(slug: string) {

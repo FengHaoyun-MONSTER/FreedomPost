@@ -1,5 +1,6 @@
 ---
 import type { TocItem } from "@freedompost/shared";
+import { createReaderBootGuardScript } from "../lib/reader-boot";
 import "../styles/global.css";
 
 interface ArticleViewModel {
@@ -38,18 +39,7 @@ const initialPayload = JSON.stringify({
   toc: article.toc
 });
 const canonicalUrl = new URL(`/p/${encodeURIComponent(article.slug)}`, Astro.site ?? "https://example.com").toString();
-const bootGuardScript = `(() => {
-  const initialSlug = ${JSON.stringify(article.slug)};
-  const match = window.location.pathname.match(/^\\/p\\/([^/]+)/);
-  if (!match) return;
-  let requestedSlug = match[1] || "";
-  try {
-    requestedSlug = decodeURIComponent(requestedSlug);
-  } catch {
-    requestedSlug = "";
-  }
-  document.documentElement.classList.add("article-boot-pending");
-})();`;
+const bootGuardScript = createReaderBootGuardScript();
 ---
 
 <!doctype html>
