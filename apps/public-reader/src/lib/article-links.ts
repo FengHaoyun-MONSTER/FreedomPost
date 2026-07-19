@@ -27,11 +27,16 @@ export function articlePermalinkPath(slug: string, referral?: string | null): st
   return normalizedReferral ? `${path}?ref=${encodeURIComponent(normalizedReferral)}` : path;
 }
 
-export function articleReaderPath(slug?: string | null, referral?: string | null): string {
+export function articleReaderPath(
+  slug?: string | null,
+  referral?: string | null,
+  options: { embedded?: boolean } = {}
+): string {
   const params = new URLSearchParams();
   if (slug) params.set("post", slug);
   const normalizedReferral = normalizeReferral(referral);
   if (normalizedReferral) params.set("ref", normalizedReferral);
+  if (options.embedded) params.set("embed", "portal");
   const query = params.toString();
   return query ? `/reader/?${query}` : "/reader/";
 }

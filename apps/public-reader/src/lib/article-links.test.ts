@@ -11,6 +11,13 @@ describe("article link helpers", () => {
   it("builds a short permalink with a validated referral", () => {
     expect(articlePermalinkPath("Ab3dE6gH8_", "wechat_01")).toBe("/p/Ab3dE6gH8_?ref=wechat_01");
     expect(articleReaderPath("Ab3dE6gH8_", "wechat_01")).toBe("/reader/?post=Ab3dE6gH8_&ref=wechat_01");
+    expect(articleReaderPath("Ab3dE6gH8_", "wechat_01", { embedded: true })).toBe(
+      "/reader/?post=Ab3dE6gH8_&ref=wechat_01&embed=portal"
+    );
+  });
+
+  it("marks an embedded article index even when no post was selected", () => {
+    expect(articleReaderPath(null, "wechat_01", { embedded: true })).toBe("/reader/?ref=wechat_01&embed=portal");
   });
 
   it("does not propagate an invalid referral", () => {

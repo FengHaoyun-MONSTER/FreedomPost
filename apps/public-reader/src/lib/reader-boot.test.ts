@@ -6,7 +6,7 @@ import {
   releaseReaderBootGuardIfUnrequested
 } from "./reader-boot.js";
 
-function releasedState(requestedSlug: string | null): { classes: string[]; styles: string[] } {
+function releasedState(requestedSlug: string | null, embedded = false): { classes: string[]; styles: string[] } {
   const removed: string[] = [];
   const styles: string[] = [];
   releaseReaderBootGuardIfUnrequested(
@@ -19,7 +19,8 @@ function releasedState(requestedSlug: string | null): { classes: string[]; style
         }
       }
     },
-    requestedSlug
+    requestedSlug,
+    embedded
   );
   return { classes: removed, styles };
 }
@@ -32,6 +33,10 @@ describe("reader boot guard", () => {
 
   it("keeps the static seed article hidden while a requested article loads", () => {
     expect(releasedState("p_Ab3dE6gH")).toEqual({ classes: [], styles: [] });
+  });
+
+  it("keeps it hidden while an embedded article index selects the latest post", () => {
+    expect(releasedState(null, true)).toEqual({ classes: [], styles: [] });
   });
 
   it("reveals the seed article only when no article was requested", () => {

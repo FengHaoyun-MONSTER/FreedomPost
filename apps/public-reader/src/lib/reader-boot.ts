@@ -17,7 +17,8 @@ export function finishReaderBootGuard(root: ClassListRoot, body: StyleBody): voi
 export function releaseReaderBootGuardIfUnrequested(
   root: ClassListRoot,
   body: StyleBody,
-  requestedSlug: string | null
+  requestedSlug: string | null,
+  embedded = false
 ): void {
-  if (!requestedSlug) finishReaderBootGuard(root, body);
+  if (!requestedSlug && !embedded) finishReaderBootGuard(root, body);
 }

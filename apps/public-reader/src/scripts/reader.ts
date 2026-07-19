@@ -123,7 +123,8 @@ const commentDefaultPlaceholder = "写下评论或者粘贴图片或者拖入文
 const initial = readInitialPayload();
 const pathSlug = readArticleSlugFromPath(location.pathname);
 const requestedSlug = pageSearchParams.get("post")?.trim() || pathSlug || null;
-releaseReaderBootGuardIfUnrequested(document.documentElement, document.body, requestedSlug);
+const embeddedPortal = pageSearchParams.get("embed") === "portal";
+releaseReaderBootGuardIfUnrequested(document.documentElement, document.body, requestedSlug, embeddedPortal);
 let activeSlug = requestedSlug ?? initial?.slug ?? document.body.dataset.activeSlug ?? "";
 let posts: PostListItem[] = [];
 let searchDocs: SearchDocument[] = [];
@@ -183,6 +184,9 @@ async function init() {
       articleCache.delete(nextSlug);
       await openArticle(nextSlug, { push: false, countView: false });
     }
+  } else if (embeddedPortal) {
+    renderUnavailableArticle();
+    finishReaderBootGuard(document.documentElement, document.body);
   }
 
   prefetchIdleArticles();

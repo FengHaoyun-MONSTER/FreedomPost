@@ -172,7 +172,7 @@ function syncArticleReader() {
   const routeSlug = readArticleSlugFromPath(location.pathname);
   const declaredSlug = document.querySelector<HTMLElement>(".reader-route")?.dataset.articleSlug?.trim();
   const requestedPost = new URLSearchParams(location.search).get("post")?.trim() || routeSlug || declaredSlug || null;
-  const nextSource = articleReaderPath(requestedPost, lockedReferral());
+  const nextSource = articleReaderPath(requestedPost, lockedReferral(), { embedded: true });
   if (frame.getAttribute("src") !== nextSource) frame.src = nextSource;
 }
 
