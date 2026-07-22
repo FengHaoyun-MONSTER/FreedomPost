@@ -417,12 +417,6 @@ button:hover {
   max-width: 100%;
 }
 
-.editor-image figcaption {
-  margin-top: 6px;
-  color: #667085;
-  font-size: 12px;
-}
-
 .editor-attachment {
   display: flex;
   align-items: center;

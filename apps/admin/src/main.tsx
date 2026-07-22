@@ -17,6 +17,7 @@ import {
   Underline,
   Upload
 } from "lucide-react";
+import { editorImageHtml } from "./editor-media.js";
 import "./styles.css";
 
 type AdminPost = {
@@ -1191,12 +1192,6 @@ async function uploadEmbeddedImage(src: string, name: string): Promise<UploadedF
   return uploadFile(file);
 }
 
-function editorImageHtml(url: string, name: string): string {
-  const safeUrl = escapeAttribute(url);
-  const safeName = escapeAttribute(name || "image.png");
-  return `<figure class="editor-image" data-fp-type="image"><a href="${safeUrl}" target="_blank" rel="noreferrer noopener"><img src="${safeUrl}" alt="${safeName}" /></a><figcaption>${escapeHtml(name || "image.png")}</figcaption></figure>`;
-}
-
 async function uploadFile(file: File): Promise<UploadedFile> {
   const formData = new FormData();
   formData.set("file", file);
@@ -1350,7 +1345,7 @@ function nodeToMarkdown(node: Node): string {
   if (node.matches("figure.editor-image")) {
     const img = node.querySelector("img");
     if (!img) return "";
-    return `![${escapeMarkdown(img.alt || node.querySelector("figcaption")?.textContent?.trim() || "图片")}](${img.src})`;
+    return `![${escapeMarkdown(img.alt || "图片")}](${img.src})`;
   }
 
   if (node.matches(".editor-attachment")) {
