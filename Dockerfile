@@ -18,7 +18,12 @@ RUN npm config set registry "$NPM_REGISTRY" \
   && npm config set fetch-retry-factor 2 \
   && npm config set fetch-retry-mintimeout 20000 \
   && npm config set fetch-retry-maxtimeout 120000 \
-  && npm ci --no-audit --no-fund
+  && for attempt in 1 2 3; do \
+    npm ci --no-audit --no-fund && break; \
+    if [ "$attempt" -eq 3 ]; then exit 1; fi; \
+    rm -rf node_modules; \
+    sleep "$((attempt * 10))"; \
+  done
 
 FROM deps AS build
 ARG PUBLIC_SITE_URL=https://example.com
