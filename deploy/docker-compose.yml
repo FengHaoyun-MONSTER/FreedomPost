@@ -33,8 +33,6 @@ services:
       - redis
     volumes:
       - ../runtime:/app/runtime
-    ports:
-      - "3000:3000"
 
   postgres:
     image: postgres:16-alpine

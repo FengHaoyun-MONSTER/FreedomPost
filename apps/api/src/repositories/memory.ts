@@ -22,8 +22,13 @@ import type {
   StoredTool,
   ToolInput,
   AffiliateProductView,
+  CompleteBenefitClaimInput,
+  CreateBenefitClaimInput,
+  CreateBenefitClaimResult,
   StoredAffiliate,
   StoredAffiliateOrder,
+  StoredBenefitCampaign,
+  StoredBenefitClaim,
   StoredProduct,
   UpdatePostInput
 } from "./types.js";
@@ -58,11 +63,24 @@ export class MemoryContentRepository implements ContentRepository {
   private readonly affiliateOrders = new Map<string, StoredAffiliateOrder>();
   private readonly commentsBySlug = new Map<string, Comment[]>();
   private readonly views = new Set<string>();
+  private readonly benefitCampaigns = new Map<string, StoredBenefitCampaign>();
+  private readonly benefitClaims = new Map<string, StoredBenefitClaim>();
+  private readonly benefitClaimsByExternalId = new Map<string, string>();
+  private readonly benefitClaimsByBrowser = new Map<string, string>();
 
   constructor(seedPosts = createSeedPosts()) {
     for (const post of seedPosts) {
       this.posts.set(post.id, post);
     }
+    this.benefitCampaigns.set("webmaster-benefit-v1", {
+      id: "webmaster-benefit-v1",
+      name: "站长福利",
+      enabled: false,
+      startsAt: null,
+      endsAt: null,
+      createdAt: now,
+      updatedAt: now
+    });
   }
 
   async listPosts(): Promise<StoredPost[]> {
@@ -397,6 +415,142 @@ export class MemoryContentRepository implements ContentRepository {
       commissionPaidAt: commissionStatus === "paid" ? (existing.commissionPaidAt ?? now) : null
     };
     this.affiliateOrders.set(id, updated);
+    return updated;
+  }
+
+  async getBenefitCampaign(id: string): Promise<StoredBenefitCampaign | null> {
+    return this.benefitCampaigns.get(id) ?? null;
+  }
+
+  async getBenefitClaimById(id: string): Promise<StoredBenefitClaim | null> {
+    return this.benefitClaims.get(id) ?? null;
+  }
+
+  async getBenefitClaimByExternalId(externalClaimId: string): Promise<StoredBenefitClaim | null> {
+    const id = this.benefitClaimsByExternalId.get(externalClaimId);
+    return id ? (this.benefitClaims.get(id) ?? null) : null;
+  }
+
+  async getBenefitClaimByBrowserKey(campaignId: string, browserKeyHash: string): Promise<StoredBenefitClaim | null> {
+    const id = this.benefitClaimsByBrowser.get(`${campaignId}:${browserKeyHash}`);
+    return id ? (this.benefitClaims.get(id) ?? null) : null;
+  }
+
+  async countBenefitClaimsByNetworkSince(campaignId: string, networkKeyHash: string, since: string): Promise<number> {
+    return [...this.benefitClaims.values()].filter(
+      (claim) => claim.campaignId === campaignId
+        && claim.networkKeyHash === networkKeyHash
+        && claim.createdAt >= since
+    ).length;
+  }
+
+  async createBenefitClaim(input: CreateBenefitClaimInput): Promise<CreateBenefitClaimResult> {
+    if (!this.benefitCampaigns.has(input.campaignId)) {
+      throw new Error("Benefit campaign not found");
+    }
+    const existingByExternalId = await this.getBenefitClaimByExternalId(input.externalClaimId);
+    if (existingByExternalId) {
+      if (
+        existingByExternalId.campaignId !== input.campaignId
+        || existingByExternalId.browserKeyHash !== input.browserKeyHash
+      ) {
+        throw new Error("External benefit claim ownership mismatch");
+      }
+      return { claim: existingByExternalId, created: false };
+    }
+    const existingByBrowser = await this.getBenefitClaimByBrowserKey(
+      input.campaignId,
+      input.browserKeyHash
+    );
+    if (existingByBrowser) return { claim: existingByBrowser, created: false };
+
+    const createdAt = new Date().toISOString();
+    const claim: StoredBenefitClaim = {
+      id: crypto.randomUUID(),
+      campaignId: input.campaignId,
+      externalClaimId: input.externalClaimId,
+      browserKeyHash: input.browserKeyHash,
+      networkKeyHash: input.networkKeyHash,
+      status: "pending",
+      opusUserId: null,
+      opusDeviceId: null,
+      subscriptionUrlEnc: null,
+      expiresAt: null,
+      attemptCount: 0,
+      lastErrorCode: null,
+      createdAt,
+      updatedAt: createdAt
+    };
+    this.benefitClaims.set(claim.id, claim);
+    this.benefitClaimsByExternalId.set(claim.externalClaimId, claim.id);
+    this.benefitClaimsByBrowser.set(
+      `${claim.campaignId}:${claim.browserKeyHash}`,
+      claim.id
+    );
+    return { claim, created: true };
+  }
+
+  async beginBenefitProvisioning(id: string): Promise<StoredBenefitClaim | null> {
+    const existing = this.benefitClaims.get(id);
+    if (!existing || (existing.status !== "pending" && existing.status !== "failed")) {
+      return null;
+    }
+    const updated: StoredBenefitClaim = {
+      ...existing,
+      status: "provisioning",
+      attemptCount: existing.attemptCount + 1,
+      lastErrorCode: null,
+      updatedAt: new Date().toISOString()
+    };
+    this.benefitClaims.set(id, updated);
+    return updated;
+  }
+
+  async recoverStaleBenefitProvisioning(id: string, staleBefore: string): Promise<StoredBenefitClaim | null> {
+    const existing = this.benefitClaims.get(id);
+    const cutoff = Date.parse(staleBefore);
+    if (
+      !existing
+      || existing.status !== "provisioning"
+      || !Number.isFinite(cutoff)
+      || Date.parse(existing.updatedAt) >= cutoff
+    ) {
+      return null;
+    }
+    const updated: StoredBenefitClaim = {
+      ...existing,
+      status: "failed",
+      lastErrorCode: "provisioning_stale",
+      updatedAt: new Date().toISOString()
+    };
+    this.benefitClaims.set(id, updated);
+    return updated;
+  }
+
+  async completeBenefitClaim(id: string, input: CompleteBenefitClaimInput): Promise<StoredBenefitClaim | null> {
+    const existing = this.benefitClaims.get(id);
+    if (!existing || existing.status !== "provisioning") return null;
+    const updated: StoredBenefitClaim = {
+      ...existing,
+      ...input,
+      status: "ready",
+      lastErrorCode: null,
+      updatedAt: new Date().toISOString()
+    };
+    this.benefitClaims.set(id, updated);
+    return updated;
+  }
+
+  async failBenefitClaim(id: string, errorCode: string): Promise<StoredBenefitClaim | null> {
+    const existing = this.benefitClaims.get(id);
+    if (!existing || existing.status !== "provisioning") return null;
+    const updated: StoredBenefitClaim = {
+      ...existing,
+      status: "failed",
+      lastErrorCode: errorCode,
+      updatedAt: new Date().toISOString()
+    };
+    this.benefitClaims.set(id, updated);
     return updated;
   }
 

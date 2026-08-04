@@ -1,0 +1,72 @@
+name: Benefit campaign control
+
+on:
+  workflow_dispatch:
+    inputs:
+      state:
+        description: Emergency server-side campaign state
+        required: true
+        type: choice
+        options:
+          - enable
+          - disable
+
+permissions:
+  contents: read
+
+concurrency:
+  group: freedompost-benefit-campaign
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Update campaign state
+        uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f
+        env:
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          CAMPAIGN_STATE: ${{ inputs.state }}
+          PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          password: ${{ secrets.DEPLOY_KEY == '' && secrets.DEPLOY_PASSWORD || '' }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          envs: DEPLOY_PATH,CAMPAIGN_STATE,PREVIEW_DOMAIN
+          command_timeout: 5m
+          script: |
+            set -eu
+            case "$CAMPAIGN_STATE" in
+              enable) SQL_STATE=true; EXPECTED=true ;;
+              disable) SQL_STATE=false; EXPECTED=false ;;
+              *) echo "ERROR invalid-campaign-state"; exit 2 ;;
+            esac
+            cd "$DEPLOY_PATH"
+            if [ "$(id -u)" -eq 0 ]; then SUDO=""; else SUDO="sudo"; fi
+            compose() {
+              if $SUDO docker compose version >/dev/null 2>&1; then
+                $SUDO docker compose "$@"
+              elif command -v docker-compose >/dev/null 2>&1; then
+                $SUDO docker-compose "$@"
+              else
+                echo "ERROR docker-compose-required"
+                exit 3
+              fi
+            }
+            compose --env-file .env -f deploy/docker-compose.yml exec -T postgres \
+              psql -v ON_ERROR_STOP=1 -U freedompost -d freedompost \
+              -c "UPDATE benefit_campaigns SET enabled=$SQL_STATE, updated_at=now() WHERE id='webmaster-benefit-v1';" >/dev/null
+            ACTUAL=$(compose --env-file .env -f deploy/docker-compose.yml exec -T postgres \
+              psql -v ON_ERROR_STOP=1 -U freedompost -d freedompost -tAc \
+              "SELECT enabled FROM benefit_campaigns WHERE id='webmaster-benefit-v1';" | tr -d '[:space:]')
+            if [ "$SQL_STATE" = true ]; then EXPECTED_DB=t; else EXPECTED_DB=f; fi
+            if [ "$ACTUAL" != "$EXPECTED_DB" ]; then echo "ERROR campaign-db-verification"; exit 4; fi
+            RESPONSE=$(curl -fsS --max-time 20 "https://$PREVIEW_DOMAIN/api/benefits/webmaster")
+            if ! printf '%s' "$RESPONSE" | EXPECTED="$EXPECTED" node -e \
+              'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.exit(JSON.parse(s).enabled===(process.env.EXPECTED==="true")?0:1)}catch{process.exit(1)}})'; then
+              echo "ERROR campaign-api-verification"
+              exit 5
+            fi
+            echo "OK campaign-state=$CAMPAIGN_STATE"

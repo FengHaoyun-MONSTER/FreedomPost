@@ -7,6 +7,8 @@ import {
   readArticleSlugFromPath,
   referralStorageKey
 } from "../lib/article-links.js";
+import { portalActivePath } from "../lib/portal-routes.js";
+import { createPortalPageLifecycle } from "../lib/portal-page-lifecycle.js";
 
 type PostListItem = {
   slug: string;
@@ -96,6 +98,14 @@ let searchMeta = document.querySelector<HTMLElement>("#articleSearchMeta");
 let emptyState = document.querySelector<HTMLElement>("#emptyArticles");
 let routeLoading = false;
 let portalToastTimer = 0;
+const portalPageLifecycle = createPortalPageLifecycle([
+  async (root) => {
+    const benefitRoot = root.querySelector<HTMLElement>("[data-benefit-root]");
+    if (!benefitRoot) return;
+    const { initializeBenefitPage } = await import("./benefit.js");
+    return initializeBenefitPage(benefitRoot);
+  }
+]);
 
 let posts: PostListItem[] = [];
 let searchDocuments: SearchDocument[] = [];
@@ -146,6 +156,7 @@ function bindNavigation() {
 }
 
 function bindPageInteractions() {
+  void portalPageLifecycle.mount(document).catch(() => showBenefitFeatureLoadError());
   postGrid = document.querySelector<HTMLElement>("#portalPostGrid");
   searchInput = document.querySelector<HTMLInputElement>("#portalSearchInput");
   searchMeta = document.querySelector<HTMLElement>("#articleSearchMeta");
@@ -243,6 +254,7 @@ async function loadRoute(destination: URL, push: boolean) {
 
   routeLoading = true;
   document.body.classList.add("route-loading");
+  content.setAttribute("aria-busy", "true");
   try {
     const response = await fetch(destination.href, { headers: { "X-FreedomPost-Route": "1" } });
     if (!response.ok) throw new Error(`Route request failed: ${response.status}`);
@@ -253,30 +265,94 @@ async function loadRoute(destination: URL, push: boolean) {
     const nextFooter = nextDocument.querySelector<HTMLElement>("#portalFooter");
     if (!nextContent) throw new Error("Route content is missing");
 
+    const resolvedDestination = new URL(response.url || destination.href);
+    portalPageLifecycle.unmount();
     content.innerHTML = nextContent.innerHTML;
     if (footer && nextFooter) {
       footer.innerHTML = nextFooter.innerHTML;
       footer.hidden = nextFooter.hidden;
     }
-    document.title = nextDocument.title;
+    syncPortalMetadata(nextDocument);
     document.body.dataset.page = nextDocument.body.dataset.page ?? "";
-    if (push) history.pushState({}, "", `${destination.pathname}${destination.search}${destination.hash}`);
-    updateActiveNavigation(destination.pathname);
-    primaryNav?.classList.remove("open");
-    navToggle?.setAttribute("aria-expanded", "false");
-    window.scrollTo(0, 0);
+    if (push) history.pushState({}, "", `${resolvedDestination.pathname}${resolvedDestination.search}${resolvedDestination.hash}`);
+    updateActiveNavigation(resolvedDestination.pathname);
+    closePrimaryNavigation();
     bindPageInteractions();
     createPortalIcons();
+    focusRouteContent(content, resolvedDestination.hash);
   } catch {
     location.assign(destination.href);
   } finally {
     routeLoading = false;
     document.body.classList.remove("route-loading");
+    content.removeAttribute("aria-busy");
   }
 }
 
+function syncPortalMetadata(nextDocument: Document): void {
+  document.title = nextDocument.title;
+  for (const selector of [
+    'meta[name="description"]',
+    'link[rel="canonical"]',
+    'meta[property="og:title"]',
+    'meta[property="og:description"]',
+    'meta[property="og:url"]',
+    'meta[property="og:image"]'
+  ]) {
+    const current = document.head.querySelector<HTMLElement>(selector);
+    const next = nextDocument.head.querySelector<HTMLElement>(selector);
+    if (!current || !next) continue;
+    for (const attribute of ["content", "href"]) {
+      const value = next.getAttribute(attribute);
+      if (value !== null) current.setAttribute(attribute, value);
+    }
+  }
+}
+
+function closePrimaryNavigation(): void {
+  primaryNav?.classList.remove("open");
+  navToggle?.setAttribute("aria-expanded", "false");
+  navToggle?.setAttribute("aria-label", "打开导航");
+  if (navToggle) navToggle.innerHTML = '<i data-lucide="menu"></i>';
+}
+
+function focusRouteContent(content: HTMLElement, hash: string): void {
+  const hashTarget = hash ? document.getElementById(safeDecodeHash(hash)) : null;
+  const target = hashTarget ?? content.querySelector<HTMLElement>("h1") ?? content;
+  if (!target.matches("a, button, input, select, textarea, [tabindex]")) target.tabIndex = -1;
+  target.focus({ preventScroll: true });
+  if (hashTarget) hashTarget.scrollIntoView();
+  else window.scrollTo(0, 0);
+}
+
+function safeDecodeHash(hash: string): string {
+  try {
+    return decodeURIComponent(hash.slice(1));
+  } catch {
+    return hash.slice(1);
+  }
+}
+
+function showBenefitFeatureLoadError(): void {
+  const root = document.querySelector<HTMLElement>("[data-benefit-root]");
+  if (!root) return;
+  root.dataset.state = "error";
+  root.setAttribute("aria-busy", "false");
+  setPortalText(root, "#benefitStatusText", "页面功能加载失败");
+  setPortalText(root, "#benefitErrorTitle", "页面功能加载失败");
+  setPortalText(root, "#benefitErrorMessage", "请刷新页面后重试。");
+  root.querySelectorAll<HTMLElement>("[data-benefit-panel]").forEach((panel) => {
+    panel.hidden = panel.dataset.benefitPanel !== "error";
+  });
+}
+
+function setPortalText(root: ParentNode, selector: string, value: string): void {
+  const element = root.querySelector<HTMLElement>(selector);
+  if (element) element.textContent = value;
+}
+
 function updateActiveNavigation(pathname: string) {
-  const activePath = pathname.startsWith("/p/") ? "/articles/" : pathname;
+  const activePath = portalActivePath(pathname);
   document.querySelectorAll<HTMLAnchorElement>(".nav-link").forEach((link) => {
     const linkPath = new URL(link.href, location.href).pathname;
     const active = linkPath === activePath;

@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+import {
+  legacyPortalRedirects,
+  portalActivePath,
+  portalNavItems,
+  portalSitemapPaths
+} from "./portal-routes.js";
+
+describe("portal routes", () => {
+  it("replaces the topics navigation entry with webmaster benefit", () => {
+    expect(portalNavItems).toContainEqual({
+      id: "benefit",
+      href: "/benefit/",
+      label: "站长福利"
+    });
+    const navigation: ReadonlyArray<{ id: string; href: string }> = portalNavItems;
+    expect(navigation.some((item) => item.id === "topics" || item.href === "/topics/")).toBe(false);
+  });
+
+  it("keeps the historical topics route as a permanent compatibility redirect", () => {
+    expect(legacyPortalRedirects["/topics/"]).toEqual({
+      status: 301,
+      destination: "/benefit/"
+    });
+    expect(portalActivePath("/topics/")).toBe("/benefit/");
+    expect(portalActivePath("/topics")).toBe("/benefit/");
+  });
+
+  it("maps article permalinks back to the articles navigation entry", () => {
+    expect(portalActivePath("/p/a-post-slug")).toBe("/articles/");
+  });
+
+  it("publishes only the canonical benefit route in the sitemap", () => {
+    expect(portalSitemapPaths).toContain("/benefit/");
+    expect(portalSitemapPaths).not.toContain("/topics/");
+    expect(new Set(portalSitemapPaths).size).toBe(portalSitemapPaths.length);
+  });
+});

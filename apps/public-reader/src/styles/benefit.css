@@ -1,0 +1,338 @@
+.benefit-page {
+  padding-bottom: 84px;
+}
+
+.benefit-page :is(button, a, [tabindex]):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--portal-accent) 72%, white);
+  outline-offset: 3px;
+}
+
+.benefit-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+  gap: 56px;
+  align-items: end;
+}
+
+.benefit-hero h1 {
+  max-width: 760px;
+}
+
+.benefit-hero-copy {
+  max-width: 680px;
+  color: var(--portal-muted);
+  font-size: 17px;
+}
+
+.benefit-hero-note {
+  padding: 24px;
+  border: 1px solid var(--portal-line);
+  background: var(--portal-panel-soft);
+}
+
+.benefit-hero-note strong,
+.benefit-hero-note span {
+  display: block;
+}
+
+.benefit-hero-note strong {
+  font-size: 15px;
+}
+
+.benefit-hero-note span {
+  margin-top: 8px;
+  color: var(--portal-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.benefit-specs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.benefit-spec {
+  min-height: 150px;
+  padding: 22px;
+  border: 1px solid var(--portal-line);
+  background: var(--portal-panel);
+}
+
+.benefit-spec svg {
+  width: 22px;
+  height: 22px;
+  color: var(--portal-accent);
+}
+
+.benefit-spec strong,
+.benefit-spec span {
+  display: block;
+}
+
+.benefit-spec strong {
+  margin-top: 24px;
+  font-size: 21px;
+}
+
+.benefit-spec span {
+  margin-top: 5px;
+  color: var(--portal-muted);
+  font-size: 13px;
+}
+
+.benefit-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.6fr);
+  border: 1px solid var(--portal-line-strong);
+  background: var(--portal-panel);
+  min-width: 0;
+}
+
+.benefit-stage {
+  min-height: 460px;
+  padding: 36px;
+  border-right: 1px solid var(--portal-line);
+  min-width: 0;
+}
+
+.benefit-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+  color: var(--portal-muted);
+  font-size: 13px;
+}
+
+.benefit-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--portal-gold);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--portal-gold) 12%, transparent);
+}
+
+[data-state="ready"] .benefit-status-dot {
+  background: var(--portal-accent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--portal-accent) 12%, transparent);
+}
+
+[data-state="error"] .benefit-status-dot,
+[data-state="disabled"] .benefit-status-dot {
+  background: #d36f64;
+  box-shadow: 0 0 0 5px color-mix(in srgb, #d36f64 12%, transparent);
+}
+
+.benefit-panel[hidden] {
+  display: none;
+}
+
+.benefit-panel h2 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.benefit-panel > p {
+  max-width: 620px;
+  margin: 12px 0 0;
+  color: var(--portal-muted);
+}
+
+.benefit-turnstile {
+  width: 100%;
+  min-height: 70px;
+  margin: 26px 0 18px;
+  overflow-x: auto;
+}
+
+.benefit-claim-button {
+  min-width: 190px;
+}
+
+.benefit-claim-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
+}
+
+.benefit-progress {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 230px;
+}
+
+.benefit-spinner {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 2px solid var(--portal-line-strong);
+  border-top-color: var(--portal-accent);
+  border-radius: 50%;
+  animation: benefit-spin 0.8s linear infinite;
+}
+
+.benefit-error {
+  padding: 24px;
+  border: 1px solid color-mix(in srgb, #d36f64 45%, var(--portal-line));
+  background: color-mix(in srgb, #d36f64 7%, var(--portal-panel));
+}
+
+.benefit-error .button {
+  margin-top: 22px;
+}
+
+.benefit-ready {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 32px;
+  align-items: center;
+}
+
+.benefit-qr-wrap {
+  display: grid;
+  place-items: center;
+  width: 300px;
+  min-height: 300px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.benefit-qr-wrap canvas {
+  display: block;
+  width: 300px;
+  height: 300px;
+}
+
+.benefit-ready-details dl {
+  display: grid;
+  gap: 12px;
+  margin: 22px 0;
+}
+
+.benefit-ready-details dl div {
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--portal-line);
+}
+
+.benefit-ready-details dt {
+  color: var(--portal-muted);
+  font-size: 12px;
+}
+
+.benefit-ready-details dd {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+
+.benefit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.benefit-action-feedback {
+  min-height: 20px;
+  margin: 12px 0 0;
+  color: var(--portal-accent);
+  font-size: 12px;
+}
+
+.benefit-rules {
+  padding: 36px 28px;
+  background: var(--portal-panel-soft);
+}
+
+.benefit-rules h2 {
+  margin: 0 0 20px;
+  font-size: 18px;
+}
+
+.benefit-rules ol {
+  display: grid;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: benefit-rule;
+}
+
+.benefit-rules li {
+  position: relative;
+  padding-left: 34px;
+  color: var(--portal-muted);
+  font-size: 13px;
+  line-height: 1.7;
+  counter-increment: benefit-rule;
+}
+
+.benefit-rules li::before {
+  content: counter(benefit-rule, decimal-leading-zero);
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--portal-accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@keyframes benefit-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+  .benefit-hero,
+  .benefit-workspace,
+  .benefit-ready {
+    grid-template-columns: 1fr;
+  }
+
+  .benefit-specs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .benefit-stage {
+    border-right: 0;
+    border-bottom: 1px solid var(--portal-line);
+  }
+}
+
+@media (max-width: 560px) {
+  .benefit-specs {
+    grid-template-columns: 1fr;
+  }
+
+  .benefit-stage,
+  .benefit-rules {
+    padding: 24px 18px;
+  }
+
+  .benefit-qr-wrap,
+  .benefit-qr-wrap canvas {
+    width: min(300px, 100%);
+    height: auto;
+  }
+}
+
+@media (max-width: 420px) {
+  .benefit-hero {
+    gap: 28px;
+  }
+
+  .benefit-actions,
+  .benefit-actions .button,
+  .benefit-claim-button {
+    width: 100%;
+  }
+
+  .benefit-panel h2 {
+    font-size: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .benefit-spinner {
+    animation: none;
+  }
+}

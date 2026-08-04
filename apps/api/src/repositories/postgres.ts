@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import {
@@ -7,6 +7,8 @@ import {
   affiliateOrders as affiliateOrdersTable,
   affiliateProductMarkups as affiliateProductMarkupsTable,
   affiliates as affiliatesTable,
+  benefitCampaigns as benefitCampaignsTable,
+  benefitClaims as benefitClaimsTable,
   comments as commentsTable,
   postSlugAliases as postSlugAliasesTable,
   postViews as postViewsTable,
@@ -29,6 +31,10 @@ import type {
   AffiliateDashboard,
   AffiliateOrderStatus,
   AffiliateStatus,
+  BenefitClaimStatus,
+  CompleteBenefitClaimInput,
+  CreateBenefitClaimInput,
+  CreateBenefitClaimResult,
   CreateCommentInput,
   CreatePostInput,
   ProductInput,
@@ -40,6 +46,8 @@ import type {
   StoredPost,
   StoredAffiliate,
   StoredAffiliateOrder,
+  StoredBenefitCampaign,
+  StoredBenefitClaim,
   StoredProduct,
   UpdatePostInput
 } from "./types.js";
@@ -51,6 +59,8 @@ type AttachmentRow = typeof attachmentsTable.$inferSelect;
 type ProductRow = typeof productsTable.$inferSelect;
 type ToolRow = typeof toolsTable.$inferSelect;
 type AffiliateRow = typeof affiliatesTable.$inferSelect;
+type BenefitCampaignRow = typeof benefitCampaignsTable.$inferSelect;
+type BenefitClaimRow = typeof benefitClaimsTable.$inferSelect;
 
 export class PostgresContentRepository implements ContentRepository {
   private readonly pool: Pool;
@@ -541,6 +551,159 @@ export class PostgresContentRepository implements ContentRepository {
     return mapAffiliateOrderRow(row, affiliate[0]?.wechatId ?? "");
   }
 
+  async getBenefitCampaign(id: string): Promise<StoredBenefitCampaign | null> {
+    const [row] = await this.db
+      .select()
+      .from(benefitCampaignsTable)
+      .where(eq(benefitCampaignsTable.id, id))
+      .limit(1);
+    return row ? mapBenefitCampaignRow(row) : null;
+  }
+
+  async getBenefitClaimById(id: string): Promise<StoredBenefitClaim | null> {
+    const [row] = await this.db
+      .select()
+      .from(benefitClaimsTable)
+      .where(eq(benefitClaimsTable.id, id))
+      .limit(1);
+    return row ? mapBenefitClaimRow(row) : null;
+  }
+
+  async getBenefitClaimByExternalId(externalClaimId: string): Promise<StoredBenefitClaim | null> {
+    const [row] = await this.db
+      .select()
+      .from(benefitClaimsTable)
+      .where(eq(benefitClaimsTable.externalClaimId, externalClaimId))
+      .limit(1);
+    return row ? mapBenefitClaimRow(row) : null;
+  }
+
+  async getBenefitClaimByBrowserKey(campaignId: string, browserKeyHash: string): Promise<StoredBenefitClaim | null> {
+    const [row] = await this.db
+      .select()
+      .from(benefitClaimsTable)
+      .where(and(
+        eq(benefitClaimsTable.campaignId, campaignId),
+        eq(benefitClaimsTable.browserKeyHash, browserKeyHash)
+      ))
+      .limit(1);
+    return row ? mapBenefitClaimRow(row) : null;
+  }
+
+  async countBenefitClaimsByNetworkSince(campaignId: string, networkKeyHash: string, since: string): Promise<number> {
+    const [row] = await this.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(benefitClaimsTable)
+      .where(and(
+        eq(benefitClaimsTable.campaignId, campaignId),
+        eq(benefitClaimsTable.networkKeyHash, networkKeyHash),
+        gte(benefitClaimsTable.createdAt, new Date(since))
+      ));
+    return row?.count ?? 0;
+  }
+
+  async createBenefitClaim(input: CreateBenefitClaimInput): Promise<CreateBenefitClaimResult> {
+    const [created] = await this.db
+      .insert(benefitClaimsTable)
+      .values(input)
+      .onConflictDoNothing()
+      .returning();
+    if (created) return { claim: mapBenefitClaimRow(created), created: true };
+
+    const existingByExternalId = await this.getBenefitClaimByExternalId(
+      input.externalClaimId
+    );
+    if (existingByExternalId) {
+      if (
+        existingByExternalId.campaignId !== input.campaignId
+        || existingByExternalId.browserKeyHash !== input.browserKeyHash
+      ) {
+        throw new Error("External benefit claim ownership mismatch");
+      }
+      return { claim: existingByExternalId, created: false };
+    }
+    const existingByBrowser = await this.getBenefitClaimByBrowserKey(
+      input.campaignId,
+      input.browserKeyHash
+    );
+    if (!existingByBrowser) {
+      throw new Error("Benefit claim conflict could not be recovered");
+    }
+    return { claim: existingByBrowser, created: false };
+  }
+
+  async beginBenefitProvisioning(id: string): Promise<StoredBenefitClaim | null> {
+    const [row] = await this.db
+      .update(benefitClaimsTable)
+      .set({
+        status: "provisioning",
+        attemptCount: sql`${benefitClaimsTable.attemptCount} + 1`,
+        lastErrorCode: null,
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(benefitClaimsTable.id, id),
+        inArray(benefitClaimsTable.status, ["pending", "failed"])
+      ))
+      .returning();
+    return row ? mapBenefitClaimRow(row) : null;
+  }
+
+  async recoverStaleBenefitProvisioning(id: string, staleBefore: string): Promise<StoredBenefitClaim | null> {
+    const cutoff = new Date(staleBefore);
+    if (!Number.isFinite(cutoff.getTime())) return null;
+    const [row] = await this.db
+      .update(benefitClaimsTable)
+      .set({
+        status: "failed",
+        lastErrorCode: "provisioning_stale",
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(benefitClaimsTable.id, id),
+        eq(benefitClaimsTable.status, "provisioning"),
+        lt(benefitClaimsTable.updatedAt, cutoff)
+      ))
+      .returning();
+    return row ? mapBenefitClaimRow(row) : null;
+  }
+
+  async completeBenefitClaim(id: string, input: CompleteBenefitClaimInput): Promise<StoredBenefitClaim | null> {
+    const [row] = await this.db
+      .update(benefitClaimsTable)
+      .set({
+        opusUserId: input.opusUserId,
+        opusDeviceId: input.opusDeviceId,
+        subscriptionUrlEnc: input.subscriptionUrlEnc,
+        expiresAt: new Date(input.expiresAt),
+        status: "ready",
+        lastErrorCode: null,
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(benefitClaimsTable.id, id),
+        eq(benefitClaimsTable.status, "provisioning")
+      ))
+      .returning();
+    return row ? mapBenefitClaimRow(row) : null;
+  }
+
+  async failBenefitClaim(id: string, errorCode: string): Promise<StoredBenefitClaim | null> {
+    const [row] = await this.db
+      .update(benefitClaimsTable)
+      .set({
+        status: "failed",
+        lastErrorCode: errorCode,
+        updatedAt: new Date()
+      })
+      .where(and(
+        eq(benefitClaimsTable.id, id),
+        eq(benefitClaimsTable.status, "provisioning")
+      ))
+      .returning();
+    return row ? mapBenefitClaimRow(row) : null;
+  }
+
   private async listAffiliateOrdersFor(affiliateId?: string): Promise<StoredAffiliateOrder[]> {
     const query = this.db
       .select({ order: affiliateOrdersTable, wechatId: affiliatesTable.wechatId })
@@ -652,6 +815,37 @@ function mapAffiliateRow(row: AffiliateRow): StoredAffiliate {
     passwordHash: row.passwordHash,
     defaultMarkupPercent: row.defaultMarkupPercent,
     status: row.status === "disabled" ? "disabled" : "active",
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt)
+  };
+}
+
+function mapBenefitCampaignRow(row: BenefitCampaignRow): StoredBenefitCampaign {
+  return {
+    id: row.id,
+    name: row.name,
+    enabled: row.enabled,
+    startsAt: row.startsAt ? toIso(row.startsAt) : null,
+    endsAt: row.endsAt ? toIso(row.endsAt) : null,
+    createdAt: toIso(row.createdAt),
+    updatedAt: toIso(row.updatedAt)
+  };
+}
+
+function mapBenefitClaimRow(row: BenefitClaimRow): StoredBenefitClaim {
+  return {
+    id: row.id,
+    campaignId: row.campaignId,
+    externalClaimId: row.externalClaimId,
+    browserKeyHash: row.browserKeyHash,
+    networkKeyHash: row.networkKeyHash,
+    status: row.status as BenefitClaimStatus,
+    opusUserId: row.opusUserId,
+    opusDeviceId: row.opusDeviceId,
+    subscriptionUrlEnc: row.subscriptionUrlEnc,
+    expiresAt: row.expiresAt ? toIso(row.expiresAt) : null,
+    attemptCount: row.attemptCount,
+    lastErrorCode: row.lastErrorCode,
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt)
   };

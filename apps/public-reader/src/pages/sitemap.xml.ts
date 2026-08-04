@@ -1,17 +1,11 @@
 import type { APIRoute } from "astro";
 import { articles } from "../lib/articles";
+import { portalSitemapPaths } from "../lib/portal-routes.js";
 
 export const GET: APIRoute = ({ site }) => {
   const origin = site?.toString().replace(/\/$/, "") ?? "https://example.com";
   const urls = [
-    `${origin}/`,
-    `${origin}/articles/`,
-    `${origin}/tools/`,
-    `${origin}/topics/`,
-    `${origin}/market/`,
-    `${origin}/earn/`,
-    `${origin}/guide/`,
-    `${origin}/about/`,
+    ...portalSitemapPaths.map((path) => `${origin}${path}`),
     ...articles.map((article) => `${origin}/p/${encodeURIComponent(article.slug)}`)
   ];
 

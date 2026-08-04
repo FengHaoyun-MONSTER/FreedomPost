@@ -1,0 +1,103 @@
+---
+import PortalShell from "../layouts/PortalShell.astro";
+import "../styles/benefit.css";
+---
+
+<PortalShell activePage="benefit" title="站长福利" description="FreedomPost 为站长准备的限时订阅福利。">
+  <div id="webmasterBenefit" class="benefit-page" data-benefit-root data-state="loading" aria-busy="true">
+  <header class="page-hero portal-container benefit-hero">
+    <p class="eyebrow"><span></span> Webmaster benefit</p>
+    <div class="page-hero-row">
+      <div>
+        <h1>站长福利</h1>
+        <p class="benefit-hero-copy">完成一次人机验证，即可领取 30 GB、有效期 15 天的专属订阅。</p>
+      </div>
+    </div>
+    <aside class="benefit-hero-note">
+      <strong>无需注册账户</strong>
+      <span>领取状态由当前浏览器的安全 Cookie 恢复。订阅地址不会写入浏览器本地存储，也不会发送到第三方二维码服务。</span>
+    </aside>
+  </header>
+
+  <section class="portal-section topic-section" aria-labelledby="benefitPreviewHeading">
+    <div class="portal-container">
+      <div class="section-head">
+        <div><p class="section-kicker">Benefit preview</p><h2 id="benefitPreviewHeading">固定福利套餐</h2></div>
+      </div>
+      <div class="benefit-specs">
+        <article class="benefit-spec"><i data-lucide="database"></i><strong data-benefit-traffic>30 GB</strong><span>固定流量额度</span></article>
+        <article class="benefit-spec"><i data-lucide="calendar-clock"></i><strong data-benefit-duration>15 天</strong><span>从创建成功开始</span></article>
+        <article class="benefit-spec"><i data-lucide="fingerprint"></i><strong data-benefit-hwid>强制绑定</strong><span>HWID 设备保护</span></article>
+        <article class="benefit-spec"><i data-lucide="network"></i><strong data-benefit-ip-limit>2 个</strong><span>公网 IP 上限</span></article>
+      </div>
+
+      <div class="benefit-workspace">
+        <div class="benefit-stage">
+          <div class="benefit-status" role="status" aria-live="polite">
+            <span class="benefit-status-dot" aria-hidden="true"></span>
+            <span id="benefitStatusText">正在读取活动信息…</span>
+          </div>
+
+          <section class="benefit-panel benefit-progress" data-benefit-panel="progress" aria-labelledby="benefitProgressTitle">
+            <span class="benefit-spinner" aria-hidden="true"></span>
+            <div><h2 id="benefitProgressTitle">正在准备</h2><p id="benefitProgressMessage">系统正在恢复当前浏览器的领取状态。</p></div>
+          </section>
+
+          <section class="benefit-panel" data-benefit-panel="claim" aria-labelledby="benefitClaimHeading" hidden>
+            <h2 id="benefitClaimHeading">领取专属订阅</h2>
+            <p>人机验证成功后点击领取。创建过程中请不要重复提交。</p>
+            <div id="benefitTurnstile" class="benefit-turnstile" aria-label="人机验证" hidden></div>
+            <button id="benefitClaimButton" class="button primary benefit-claim-button" type="button" disabled>
+              <i data-lucide="gift"></i><span>立即领取</span>
+            </button>
+          </section>
+
+          <section class="benefit-panel" data-benefit-panel="disabled" aria-labelledby="benefitDisabledHeading" hidden>
+            <h2 id="benefitDisabledHeading">活动暂未开放</h2>
+            <p>页面已经准备完成，活动启用后即可在这里领取。</p>
+          </section>
+
+          <section class="benefit-panel benefit-error" data-benefit-panel="error" aria-labelledby="benefitErrorTitle" hidden role="alert">
+            <h2 id="benefitErrorTitle">暂时无法完成领取</h2>
+            <p id="benefitErrorMessage">服务暂时不可用，请稍后重试。</p>
+            <button id="benefitRetryButton" class="button secondary" type="button">重新验证并重试</button>
+          </section>
+
+          <section class="benefit-panel benefit-ready" data-benefit-panel="ready" aria-labelledby="benefitReadyHeading" hidden>
+            <div class="benefit-qr-wrap">
+              <canvas id="benefitQrCanvas" width="300" height="300" role="img" aria-label="站长福利订阅二维码"></canvas>
+            </div>
+            <div class="benefit-ready-details">
+              <p class="section-kicker">Claim ready</p>
+              <h2 id="benefitReadyHeading">订阅已经准备好</h2>
+              <p>使用支持订阅二维码的客户端扫描，或者复制链接后导入客户端。</p>
+              <dl>
+                <div><dt>到期时间</dt><dd id="benefitExpiresAt">—</dd></div>
+                <div><dt>流量额度</dt><dd id="benefitReadyTraffic">—</dd></div>
+                <div><dt>IP 限制</dt><dd id="benefitReadyIpLimit">—</dd></div>
+                <div><dt>设备保护</dt><dd id="benefitReadyHwid">—</dd></div>
+              </dl>
+              <div class="benefit-actions">
+                <button id="benefitCopyButton" class="button primary" type="button"><i data-lucide="copy"></i><span>复制订阅链接</span></button>
+                <button id="benefitDownloadButton" class="button secondary" type="button"><i data-lucide="download"></i><span>下载二维码</span></button>
+              </div>
+              <p id="benefitActionFeedback" class="benefit-action-feedback" aria-live="polite"></p>
+            </div>
+          </section>
+        </div>
+
+        <aside class="benefit-rules" aria-labelledby="benefitRulesHeading">
+          <h2 id="benefitRulesHeading">领取与使用说明</h2>
+          <ol>
+            <li>每个浏览器只会创建一份福利，刷新页面可以恢复同一二维码。</li>
+            <li>首次通过兼容客户端连接时绑定 HWID，请优先在常用设备上导入。</li>
+            <li>同一订阅允许最多两个公网出口 IP，频繁切换网络可能触发限制。</li>
+            <li>二维码在当前浏览器本地生成；请勿公开分享截图或订阅链接。</li>
+          </ol>
+        </aside>
+      </div>
+    </div>
+  </section>
+  </div>
+
+</PortalShell>

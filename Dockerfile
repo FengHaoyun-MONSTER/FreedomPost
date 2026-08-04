@@ -41,6 +41,8 @@ COPY --from=build /app/apps/api/dist /app/apps/api/dist
 COPY --from=build /app/apps/api/package.json /app/apps/api/package.json
 COPY --from=build /app/packages /app/packages
 COPY --from=build /app/deploy/migrations /app/deploy/migrations
+COPY --from=build /app/deploy/production-preflight.mjs /app/deploy/production-preflight.mjs
+COPY --from=build /app/deploy/integration-staging-smoke.mjs /app/deploy/integration-staging-smoke.mjs
 EXPOSE 3000
 CMD ["npm", "run", "start", "-w", "@freedompost/api"]
 

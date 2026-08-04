@@ -13,3 +13,7 @@ npm-debug.log*
 certs/
 backups/
 docs/
+!docs/
+docs/*
+!docs/WEBMASTER_BENEFIT_DETAILED_DESIGN.md
+!docs/WEBMASTER_BENEFIT_DEPLOYMENT.md

@@ -23,7 +23,8 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run build:packages && npm run typecheck:workspaces",
     "typecheck:workspaces": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && npm run test:deploy-preflight",
+    "test:deploy-preflight": "node --test deploy/*.test.mjs",
     "lint": "npm run lint --workspaces --if-present",
     "check": "npm run typecheck && npm run test && npm run build"
   },

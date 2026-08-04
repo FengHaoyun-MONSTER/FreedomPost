@@ -1,8 +1,9 @@
 ---
 import "../styles/portal.css";
+import { portalNavItems, type PortalPageId } from "../lib/portal-routes.js";
 
 interface Props {
-  activePage: "home" | "articles" | "tools" | "topics" | "market" | "earn" | "guide" | "about";
+  activePage: PortalPageId;
   title: string;
   description: string;
   hideFooter?: boolean;
@@ -12,16 +13,6 @@ const { activePage, title, description, hideFooter = false } = Astro.props;
 const siteName = "FreedomPost";
 const pageTitle = activePage === "home" ? siteName : `${title} - ${siteName}`;
 const canonicalUrl = new URL(Astro.url.pathname, Astro.site ?? "https://example.com").toString();
-const navItems = [
-  { id: "home", href: "/", label: "首页" },
-  { id: "market", href: "/market/", label: "商城" },
-  { id: "earn", href: "/earn/", label: "分享赚钱", className: "earn-nav-link" },
-  { id: "articles", href: "/articles/", label: "文章" },
-  { id: "tools", href: "/tools/", label: "博主常用工具" },
-  { id: "topics", href: "/topics/", label: "专题" },
-  { id: "guide", href: "/guide/", label: "使用指南" },
-  { id: "about", href: "/about/", label: "关于" }
-] as const;
 ---
 
 <!doctype html>
@@ -58,7 +49,7 @@ const navItems = [
 
         <nav id="primaryNav" class="primary-nav" aria-label="主导航">
           {
-            navItems.map((item) => (
+            portalNavItems.map((item) => (
               <a class:list={["nav-link", "className" in item ? item.className : undefined, { active: activePage === item.id }]} href={item.href} data-portal-route aria-current={activePage === item.id ? "page" : undefined}>
                 {item.label}
               </a>

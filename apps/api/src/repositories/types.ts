@@ -168,6 +168,60 @@ export interface RecordViewResult {
   viewCount: number;
 }
 
+export type BenefitClaimStatus =
+  | "pending"
+  | "provisioning"
+  | "ready"
+  | "failed"
+  | "revoked"
+  | "expired";
+
+export interface StoredBenefitCampaign {
+  id: string;
+  name: string;
+  enabled: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface StoredBenefitClaim {
+  id: string;
+  campaignId: string;
+  externalClaimId: string;
+  browserKeyHash: string;
+  networkKeyHash: string;
+  status: BenefitClaimStatus;
+  opusUserId: string | null;
+  opusDeviceId: string | null;
+  subscriptionUrlEnc: string | null;
+  expiresAt: string | null;
+  attemptCount: number;
+  lastErrorCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateBenefitClaimInput {
+  campaignId: string;
+  externalClaimId: string;
+  browserKeyHash: string;
+  networkKeyHash: string;
+}
+
+export interface CompleteBenefitClaimInput {
+  opusUserId: string;
+  opusDeviceId: string;
+  subscriptionUrlEnc: string;
+  expiresAt: string;
+}
+
+export interface CreateBenefitClaimResult {
+  claim: StoredBenefitClaim;
+  created: boolean;
+}
+
 export interface ContentRepository {
   listPosts(): Promise<StoredPost[]>;
   listPostSummaries(): Promise<PostListItem[]>;
@@ -204,4 +258,14 @@ export interface ContentRepository {
   createAffiliateOrder(affiliateId: string, product: StoredProduct, priceCents: number, commissionCents: number): Promise<StoredAffiliateOrder>;
   listAffiliateOrders(): Promise<StoredAffiliateOrder[]>;
   updateAffiliateOrder(id: string, orderStatus: AffiliateOrderStatus, commissionStatus: AffiliateCommissionStatus): Promise<StoredAffiliateOrder | null>;
+  getBenefitCampaign(id: string): Promise<StoredBenefitCampaign | null>;
+  getBenefitClaimById(id: string): Promise<StoredBenefitClaim | null>;
+  getBenefitClaimByExternalId(externalClaimId: string): Promise<StoredBenefitClaim | null>;
+  getBenefitClaimByBrowserKey(campaignId: string, browserKeyHash: string): Promise<StoredBenefitClaim | null>;
+  countBenefitClaimsByNetworkSince(campaignId: string, networkKeyHash: string, since: string): Promise<number>;
+  createBenefitClaim(input: CreateBenefitClaimInput): Promise<CreateBenefitClaimResult>;
+  beginBenefitProvisioning(id: string): Promise<StoredBenefitClaim | null>;
+  recoverStaleBenefitProvisioning(id: string, staleBefore: string): Promise<StoredBenefitClaim | null>;
+  completeBenefitClaim(id: string, input: CompleteBenefitClaimInput): Promise<StoredBenefitClaim | null>;
+  failBenefitClaim(id: string, errorCode: string): Promise<StoredBenefitClaim | null>;
 }

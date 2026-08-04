@@ -6,16 +6,24 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
+concurrency:
+  group: freedompost-production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
           cache: npm
@@ -81,38 +89,26 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
           R2_PREFIX: ${{ secrets.R2_PREFIX }}
+          TRUST_PROXY: "true"
+          REDIS_URL: redis://redis:6379
+          TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+          TURNSTILE_EXPECTED_HOSTNAME: ${{ secrets.PREVIEW_DOMAIN }}
+          TURNSTILE_EXPECTED_ACTION: webmaster_benefit_claim
+          TURNSTILE_TIMEOUT_MS: "3000"
+          OPUS8_INTEGRATION_BASE_URL: ${{ secrets.OPUS8_INTEGRATION_BASE_URL }}
+          OPUS8_INTEGRATION_KEY_ID: ${{ secrets.OPUS8_INTEGRATION_KEY_ID }}
+          OPUS8_INTEGRATION_SECRET: ${{ secrets.OPUS8_INTEGRATION_SECRET }}
+          OPUS8_INTEGRATION_TIMEOUT_MS: "5000"
+          BENEFIT_CLAIM_HMAC_SECRET: ${{ secrets.BENEFIT_CLAIM_HMAC_SECRET }}
+          BENEFIT_LINK_ENCRYPTION_KEY: ${{ secrets.BENEFIT_LINK_ENCRYPTION_KEY }}
+          BENEFIT_NETWORK_DAILY_LIMIT: "3"
+          BENEFIT_CLAIM_MINUTE_LIMIT: "6"
         run: |
-          missing=0
-          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH COOKIE_SECRET VISITOR_HASH_SALT ADMIN_PASSWORD POSTGRES_PASSWORD PREVIEW_DOMAIN STORAGE_DRIVER; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Missing GitHub secret: $name"
-              missing=1
-            fi
-          done
-          if [ -z "$DEPLOY_PASSWORD" ] && [ -z "$DEPLOY_KEY" ]; then
-            echo "::error::Missing GitHub secret: DEPLOY_PASSWORD or DEPLOY_KEY"
-            missing=1
-          fi
-          if [ "$STORAGE_DRIVER" = "oss" ]; then
-            for name in ALIYUN_OSS_REGION ALIYUN_OSS_BUCKET ALIYUN_OSS_ACCESS_KEY_ID ALIYUN_OSS_ACCESS_KEY_SECRET; do
-              if [ -z "${!name}" ]; then
-                echo "::error::Missing GitHub secret: $name"
-                missing=1
-              fi
-            done
-          fi
-          if [ "$STORAGE_DRIVER" = "r2" ]; then
-            for name in R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY; do
-              if [ -z "${!name}" ]; then
-                echo "::error::Missing GitHub secret: $name"
-                missing=1
-              fi
-            done
-          fi
-          exit "$missing"
+          node deploy/production-preflight.mjs
 
       - name: Prepare server disk
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -135,7 +131,7 @@ jobs:
             fi
 
       - name: Copy bundle to server
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
@@ -146,7 +142,7 @@ jobs:
           overwrite: true
 
       - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@2ead5e36573f08b82fbfce1504f1a4b05a647c6f
         env:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
           COOKIE_SECRET: ${{ secrets.COOKIE_SECRET }}
@@ -170,12 +166,19 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_PUBLIC_BASE_URL: ${{ secrets.R2_PUBLIC_BASE_URL }}
           R2_PREFIX: ${{ secrets.R2_PREFIX }}
+          TURNSTILE_SITE_KEY: ${{ secrets.TURNSTILE_SITE_KEY }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+          OPUS8_INTEGRATION_BASE_URL: ${{ secrets.OPUS8_INTEGRATION_BASE_URL }}
+          OPUS8_INTEGRATION_KEY_ID: ${{ secrets.OPUS8_INTEGRATION_KEY_ID }}
+          OPUS8_INTEGRATION_SECRET: ${{ secrets.OPUS8_INTEGRATION_SECRET }}
+          BENEFIT_CLAIM_HMAC_SECRET: ${{ secrets.BENEFIT_CLAIM_HMAC_SECRET }}
+          BENEFIT_LINK_ENCRYPTION_KEY: ${{ secrets.BENEFIT_LINK_ENCRYPTION_KEY }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           password: ${{ secrets.DEPLOY_KEY == '' && secrets.DEPLOY_PASSWORD || '' }}
           key: ${{ secrets.DEPLOY_KEY }}
-          envs: DEPLOY_PATH,COOKIE_SECRET,VISITOR_HASH_SALT,ADMIN_PASSWORD,POSTGRES_PASSWORD,PREVIEW_DOMAIN,DEPLOY_HOST,STORAGE_DRIVER,ALIYUN_OSS_REGION,ALIYUN_OSS_BUCKET,ALIYUN_OSS_ENDPOINT,ALIYUN_OSS_PUBLIC_BASE_URL,ALIYUN_OSS_PREFIX,ALIYUN_OSS_ACCESS_KEY_ID,ALIYUN_OSS_ACCESS_KEY_SECRET,R2_ACCOUNT_ID,R2_BUCKET,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_ENDPOINT,R2_PUBLIC_BASE_URL,R2_PREFIX
+          envs: DEPLOY_PATH,COOKIE_SECRET,VISITOR_HASH_SALT,ADMIN_PASSWORD,POSTGRES_PASSWORD,PREVIEW_DOMAIN,DEPLOY_HOST,STORAGE_DRIVER,ALIYUN_OSS_REGION,ALIYUN_OSS_BUCKET,ALIYUN_OSS_ENDPOINT,ALIYUN_OSS_PUBLIC_BASE_URL,ALIYUN_OSS_PREFIX,ALIYUN_OSS_ACCESS_KEY_ID,ALIYUN_OSS_ACCESS_KEY_SECRET,R2_ACCOUNT_ID,R2_BUCKET,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_ENDPOINT,R2_PUBLIC_BASE_URL,R2_PREFIX,TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,OPUS8_INTEGRATION_BASE_URL,OPUS8_INTEGRATION_KEY_ID,OPUS8_INTEGRATION_SECRET,BENEFIT_CLAIM_HMAC_SECRET,BENEFIT_LINK_ENCRYPTION_KEY
           command_timeout: 30m
           script: |
             set -eu
@@ -200,6 +203,8 @@ jobs:
                 printf 'PUBLIC_SITE_URL=https://%s\n' "$PREVIEW_DOMAIN"
                 printf 'VITE_PUBLIC_SITE_URL=https://%s\n' "$PREVIEW_DOMAIN"
                 printf '%s\n' "COOKIE_SECURE=true"
+                printf '%s\n' "TRUST_PROXY=true"
+                printf '%s\n' "REDIS_URL=redis://redis:6379"
                 printf '%s\n' "API_BODY_LIMIT_BYTES=104857600"
                 printf '%s\n' "UPLOAD_MAX_BYTES=524288000"
                 printf 'COOKIE_SECRET=%s\n' "$COOKIE_SECRET"
@@ -214,6 +219,19 @@ jobs:
                 printf 'STORAGE_DRIVER=%s\n' "$STORAGE_DRIVER"
                 printf '%s\n' "LOCAL_STORAGE_ROOT=runtime/local-storage"
                 printf '%s\n' "PUBLIC_UPLOAD_BASE_URL=/api/uploads"
+                printf 'TURNSTILE_SITE_KEY=%s\n' "$TURNSTILE_SITE_KEY"
+                printf 'TURNSTILE_SECRET_KEY=%s\n' "$TURNSTILE_SECRET_KEY"
+                printf 'TURNSTILE_EXPECTED_HOSTNAME=%s\n' "$PREVIEW_DOMAIN"
+                printf '%s\n' "TURNSTILE_EXPECTED_ACTION=webmaster_benefit_claim"
+                printf '%s\n' "TURNSTILE_TIMEOUT_MS=3000"
+                printf 'OPUS8_INTEGRATION_BASE_URL=%s\n' "$OPUS8_INTEGRATION_BASE_URL"
+                printf 'OPUS8_INTEGRATION_KEY_ID=%s\n' "$OPUS8_INTEGRATION_KEY_ID"
+                printf 'OPUS8_INTEGRATION_SECRET=%s\n' "$OPUS8_INTEGRATION_SECRET"
+                printf '%s\n' "OPUS8_INTEGRATION_TIMEOUT_MS=5000"
+                printf 'BENEFIT_CLAIM_HMAC_SECRET=%s\n' "$BENEFIT_CLAIM_HMAC_SECRET"
+                printf 'BENEFIT_LINK_ENCRYPTION_KEY=%s\n' "$BENEFIT_LINK_ENCRYPTION_KEY"
+                printf '%s\n' "BENEFIT_NETWORK_DAILY_LIMIT=3"
+                printf '%s\n' "BENEFIT_CLAIM_MINUTE_LIMIT=6"
               } > .env
               chmod 600 .env
             fi
@@ -250,7 +268,27 @@ jobs:
             set_env "PUBLIC_SITE_URL" "https://$PREVIEW_DOMAIN"
             set_env "VITE_PUBLIC_SITE_URL" "https://$PREVIEW_DOMAIN"
             set_env "COOKIE_SECURE" "true"
+            set_env "TRUST_PROXY" "true"
+            set_env "REDIS_URL" "redis://redis:6379"
+            set_env "COOKIE_SECRET" "$COOKIE_SECRET"
+            set_env "VISITOR_HASH_SALT" "$VISITOR_HASH_SALT"
+            set_env "ADMIN_PASSWORD" "$ADMIN_PASSWORD"
+            set_env "POSTGRES_PASSWORD" "$POSTGRES_PASSWORD"
+            set_env "DATABASE_URL" "postgres://freedompost:$POSTGRES_PASSWORD@postgres:5432/freedompost"
             set_env "STORAGE_DRIVER" "$STORAGE_DRIVER"
+            set_env "TURNSTILE_SITE_KEY" "$TURNSTILE_SITE_KEY"
+            set_env "TURNSTILE_SECRET_KEY" "$TURNSTILE_SECRET_KEY"
+            set_env "TURNSTILE_EXPECTED_HOSTNAME" "$PREVIEW_DOMAIN"
+            set_env "TURNSTILE_EXPECTED_ACTION" "webmaster_benefit_claim"
+            set_env "TURNSTILE_TIMEOUT_MS" "3000"
+            set_env "OPUS8_INTEGRATION_BASE_URL" "$OPUS8_INTEGRATION_BASE_URL"
+            set_env "OPUS8_INTEGRATION_KEY_ID" "$OPUS8_INTEGRATION_KEY_ID"
+            set_env "OPUS8_INTEGRATION_SECRET" "$OPUS8_INTEGRATION_SECRET"
+            set_env "OPUS8_INTEGRATION_TIMEOUT_MS" "5000"
+            set_env "BENEFIT_CLAIM_HMAC_SECRET" "$BENEFIT_CLAIM_HMAC_SECRET"
+            set_env "BENEFIT_LINK_ENCRYPTION_KEY" "$BENEFIT_LINK_ENCRYPTION_KEY"
+            set_env "BENEFIT_NETWORK_DAILY_LIMIT" "3"
+            set_env "BENEFIT_CLAIM_MINUTE_LIMIT" "6"
             if [ "$STORAGE_DRIVER" = "oss" ]; then
               set_env "ALIYUN_OSS_REGION" "$ALIYUN_OSS_REGION"
               set_env "ALIYUN_OSS_BUCKET" "$ALIYUN_OSS_BUCKET"
@@ -382,11 +420,15 @@ jobs:
             docker_cmd image prune --all --force || true
             docker_cmd system df || true
             compose --env-file .env -f deploy/docker-compose.yml build app nginx
+            compose --env-file .env -f deploy/docker-compose.yml run --rm app node deploy/production-preflight.mjs --runtime
+            compose --env-file .env -f deploy/docker-compose.yml run --rm app node deploy/integration-staging-smoke.mjs
             compose --env-file .env -f deploy/docker-compose.yml run --rm app npm run db:migrate:prod -w @freedompost/api
             compose --env-file .env -f deploy/docker-compose.yml up -d --force-recreate app nginx
             for attempt in $(seq 1 60); do
-              if curl -fsS http://127.0.0.1:3000/health \
-                && curl -fsS -H "Host: $DEPLOY_HOST" http://127.0.0.1/ >/dev/null; then
+              if compose --env-file .env -f deploy/docker-compose.yml exec -T app node -e "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)})" \
+                && curl -kfsS --resolve "$PREVIEW_DOMAIN:443:127.0.0.1" "https://$PREVIEW_DOMAIN/health" >/dev/null \
+                && curl -kfsS --resolve "$PREVIEW_DOMAIN:443:127.0.0.1" -D /tmp/benefit-health.headers "https://$PREVIEW_DOMAIN/api/benefits/webmaster" >/dev/null \
+                && grep -qi '^cache-control:.*no-store' /tmp/benefit-health.headers; then
                 exit 0
               fi
               sleep 2

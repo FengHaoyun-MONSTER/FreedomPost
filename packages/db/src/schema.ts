@@ -1,5 +1,7 @@
 import {
   bigint,
+  boolean,
+  check,
   date,
   index,
   integer,
@@ -13,6 +15,7 @@ import {
   varchar
 } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const posts = pgTable(
   "posts",
@@ -318,6 +321,56 @@ export const commentRateLimits = pgTable(
       table.subjectHash,
       table.windowType,
       table.windowStart
+    )
+  })
+);
+
+export const benefitCampaigns = pgTable("benefit_campaigns", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  name: text("name").notNull(),
+  enabled: boolean("enabled").notNull().default(false),
+  startsAt: timestamp("starts_at", { withTimezone: true }),
+  endsAt: timestamp("ends_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+});
+
+export const benefitClaims = pgTable(
+  "benefit_claims",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    campaignId: varchar("campaign_id", { length: 64 })
+      .notNull()
+      .references(() => benefitCampaigns.id, { onDelete: "restrict" }),
+    externalClaimId: uuid("external_claim_id").notNull().unique(),
+    browserKeyHash: varchar("browser_key_hash", { length: 128 }).notNull(),
+    networkKeyHash: varchar("network_key_hash", { length: 128 }).notNull(),
+    status: varchar("status", { length: 16 }).notNull().default("pending"),
+    opusUserId: text("opus_user_id"),
+    opusDeviceId: text("opus_device_id"),
+    subscriptionUrlEnc: text("subscription_url_enc"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    lastErrorCode: varchar("last_error_code", { length: 64 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    campaignBrowserUnique: unique("uniq_benefit_claims_campaign_browser").on(
+      table.campaignId,
+      table.browserKeyHash
+    ),
+    networkCreatedIdx: index("idx_benefit_claims_network_created").on(
+      table.networkKeyHash,
+      table.createdAt
+    ),
+    statusUpdatedIdx: index("idx_benefit_claims_status_updated").on(
+      table.status,
+      table.updatedAt
+    ),
+    statusCheck: check(
+      "chk_benefit_claims_status",
+      sql`${table.status} IN ('pending', 'provisioning', 'ready', 'failed', 'revoked', 'expired')`
     )
   })
 );

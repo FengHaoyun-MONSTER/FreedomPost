@@ -29,6 +29,11 @@ import {
   type ToolInput
 } from "./repositories/index.js";
 import { createStorageAdapter, getLocalUploadStream } from "./storage.js";
+import {
+  registerWebmasterBenefitRoutes,
+  type WebmasterBenefitRouteDependencies
+} from "./benefits/benefit-routes.js";
+import { createWebmasterBenefitRuntime } from "./benefits/benefit-runtime.js";
 
 const sessions = new Map<string, { username: string; createdAt: string }>();
 const affiliateSessions = new Map<string, { affiliateId: string; wechatId: string; createdAt: string }>();
@@ -46,20 +51,63 @@ const nouns = ["河流", "山影", "晨光", "星火", "纸页", "远帆", "云�
 
 export interface BuildAppOptions {
   repository?: ContentRepository;
+  benefit?: WebmasterBenefitRouteDependencies | null;
+  corsAllowedOrigins?: string[];
+  trustProxy?: boolean;
 }
+
+export const BENEFIT_LOG_REDACT_PATHS = [
+  "req.headers.cookie",
+  "req.headers.authorization",
+  "req.headers['x-opus8-integration-signature']",
+  "req.body.turnstileToken",
+  "res.headers.set-cookie"
+] as const;
 
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const repository = options.repository ?? createContentRepository();
   const storage = createStorageAdapter();
   const app = Fastify({
     bodyLimit: Number(process.env.API_BODY_LIMIT_BYTES ?? 100 * 1024 * 1024),
+    trustProxy: options.trustProxy ?? process.env.TRUST_PROXY === "true",
     logger: {
-      level: process.env.LOG_LEVEL ?? "info"
+      level: process.env.LOG_LEVEL ?? "info",
+      redact: {
+        paths: [...BENEFIT_LOG_REDACT_PATHS],
+        censor: "[REDACTED]"
+      }
     }
   });
+  const benefitRuntime = options.benefit === undefined
+    ? createWebmasterBenefitRuntime(process.env, {
+        secureCookies: shouldUseSecureCookies(),
+        onRedisError(error) {
+          app.log.warn({ errorName: error.name }, "Benefit Redis client error");
+        }
+      })
+    : null;
+  const benefitDependencies = options.benefit === undefined
+    ? benefitRuntime?.dependencies ?? null
+    : options.benefit;
 
+  if (benefitRuntime) {
+    app.addHook("onReady", async () => {
+      if (!await benefitRuntime.connect()) {
+        app.log.warn("Benefit Redis unavailable; strict process-local rate limit is active");
+      }
+    });
+    app.addHook("onClose", async () => {
+      await benefitRuntime.close();
+    });
+  }
+
+  const corsAllowedOrigins = options.corsAllowedOrigins
+    ? new Set(options.corsAllowedOrigins.map((origin) => normalizeOrigin(origin)).filter(Boolean))
+    : configuredCorsOrigins();
   app.register(cors, {
-    origin: true,
+    origin(origin, callback) {
+      callback(null, origin === undefined || corsAllowedOrigins.has(normalizeOrigin(origin)));
+    },
     credentials: true
   });
   app.register(cookie, {
@@ -77,6 +125,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     service: "freedompost-api",
     time: new Date().toISOString()
   }));
+
+  registerWebmasterBenefitRoutes(app, {
+    repository,
+    dependencies: benefitDependencies
+  });
 
   app.get("/api/posts", async () => ({
     items: await repository.listPostSummaries()
@@ -896,6 +949,34 @@ function errorBody(code: string, message: string) {
       message
     }
   };
+}
+
+function configuredCorsOrigins(): Set<string> {
+  const configured = [
+    process.env.PUBLIC_SITE_URL,
+    process.env.VITE_PUBLIC_SITE_URL,
+    ...(process.env.CORS_ALLOWED_ORIGINS ?? "").split(",")
+  ];
+  const origins = new Set(configured.flatMap((value) => {
+    const normalized = normalizeOrigin(value);
+    return normalized ? [normalized] : [];
+  }));
+  if (process.env.NODE_ENV !== "production") {
+    origins.add("http://localhost:3000");
+    origins.add("http://localhost:4321");
+    origins.add("http://127.0.0.1:3000");
+    origins.add("http://127.0.0.1:4321");
+  }
+  return origins;
+}
+
+function normalizeOrigin(value: string | undefined): string {
+  if (!value) return "";
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "";
+  }
 }
 
 function normalizeCommentAttachments(value: unknown): Comment["attachments"] {

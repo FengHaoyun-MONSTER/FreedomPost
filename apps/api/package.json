@@ -28,8 +28,9 @@
     "@freedompost/storage": "0.1.0",
     "bcryptjs": "latest",
     "drizzle-orm": "latest",
+    "fastify": "latest",
     "pg": "latest",
-    "fastify": "latest"
+    "redis": "^6.2.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "latest",
