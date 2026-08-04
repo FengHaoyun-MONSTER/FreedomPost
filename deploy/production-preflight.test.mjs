@@ -100,4 +100,5 @@ test("deployment workflow and Caddy keep the benefit path protected", () => {
   assert.match(caddy, /script-src[^\n]*https:\/\/challenges\.cloudflare\.com/);
   assert.match(caddy, /frame-src[^\n]*https:\/\/challenges\.cloudflare\.com/);
   assert.match(caddy, /connect-src[^\n]*https:\/\/challenges\.cloudflare\.com/);
+  assert.match(caddy, /redir @legacyTopics \/benefit\/\?\{query\} permanent/);
 });

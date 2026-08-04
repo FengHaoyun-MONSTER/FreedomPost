@@ -16,7 +16,7 @@
 	header @benefitApi Cache-Control "no-store"
 
 	@legacyTopics path /topics /topics/
-	redir @legacyTopics /benefit/ permanent
+	redir @legacyTopics /benefit/?{query} permanent
 
 	handle /api/* {
 		reverse_proxy app:3000
