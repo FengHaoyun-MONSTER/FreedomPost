@@ -78,6 +78,8 @@ test("manual campaign workflow is isolated, pinned, and fail closed", () => {
   assert.match(workflow, /options:\s*\n\s*- enable\s*\n\s*- disable/);
   assert.match(workflow, /UPDATE benefit_campaigns/);
   assert.match(workflow, /--resolve "\$PREVIEW_DOMAIN:443:127\.0\.0\.1"/);
+  assert.match(workflow, /grep -Eq/);
+  assert.doesNotMatch(workflow, /\bnode -e\b/);
   for (const action of workflow.matchAll(/^\s*uses:\s*([^\s]+)$/gm)) {
     assert.match(action[1], /@[0-9a-f]{40}$/i);
   }

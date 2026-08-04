@@ -65,8 +65,8 @@ jobs:
             if [ "$ACTUAL" != "$EXPECTED_DB" ]; then echo "ERROR campaign-db-verification"; exit 4; fi
             RESPONSE=$(curl -kfsS --max-time 20 --resolve "$PREVIEW_DOMAIN:443:127.0.0.1" \
               "https://$PREVIEW_DOMAIN/api/benefits/webmaster")
-            if ! printf '%s' "$RESPONSE" | EXPECTED="$EXPECTED" node -e \
-              'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.exit(JSON.parse(s).enabled===(process.env.EXPECTED==="true")?0:1)}catch{process.exit(1)}})'; then
+            if ! printf '%s' "$RESPONSE" | grep -Eq \
+              "\"enabled\"[[:space:]]*:[[:space:]]*${EXPECTED}([,}])"; then
               echo "ERROR campaign-api-verification"
               exit 5
             fi
