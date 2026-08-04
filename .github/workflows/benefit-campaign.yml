@@ -63,7 +63,8 @@ jobs:
               "SELECT enabled FROM benefit_campaigns WHERE id='webmaster-benefit-v1';" | tr -d '[:space:]')
             if [ "$SQL_STATE" = true ]; then EXPECTED_DB=t; else EXPECTED_DB=f; fi
             if [ "$ACTUAL" != "$EXPECTED_DB" ]; then echo "ERROR campaign-db-verification"; exit 4; fi
-            RESPONSE=$(curl -fsS --max-time 20 "https://$PREVIEW_DOMAIN/api/benefits/webmaster")
+            RESPONSE=$(curl -kfsS --max-time 20 --resolve "$PREVIEW_DOMAIN:443:127.0.0.1" \
+              "https://$PREVIEW_DOMAIN/api/benefits/webmaster")
             if ! printf '%s' "$RESPONSE" | EXPECTED="$EXPECTED" node -e \
               'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.exit(JSON.parse(s).enabled===(process.env.EXPECTED==="true")?0:1)}catch{process.exit(1)}})'; then
               echo "ERROR campaign-api-verification"
