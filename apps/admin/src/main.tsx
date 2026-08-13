@@ -1079,7 +1079,7 @@ function ToolWorkspace({
 
   async function createTool() {
     const response = await fetch("/api/admin/tools", { method: "POST", headers: { "content-type": "application/json" }, credentials: "include", body: JSON.stringify(defaultToolPayload()) });
-    if (!response.ok) return showToast("创建工具失败");
+    if (!response.ok) return showToast(await apiErrorMessage(response, "创建工具失败"));
     const created = await response.json() as AdminTool;
     setTools((items) => [created, ...items]);
     setActiveId(created.id);
@@ -1088,8 +1088,11 @@ function ToolWorkspace({
 
   async function saveTool() {
     if (!activeTool) return;
+    if (activeTool.url.trim() && !isHttpUrl(activeTool.url)) return showToast("官网地址需要以 http:// 或 https:// 开头");
+    if (activeTool.status === "published" && !activeTool.summary.trim()) return showToast("公开发布前，请填写一句话简介");
+    if (activeTool.status === "published" && !activeTool.url.trim()) return showToast("公开发布前，请填写官网地址");
     const response = await fetch(`/api/admin/tools/${activeTool.id}`, { method: "PUT", headers: { "content-type": "application/json" }, credentials: "include", body: JSON.stringify(toolPayload(activeTool)) });
-    if (!response.ok) return showToast("保存失败，请检查工具信息");
+    if (!response.ok) return showToast(await apiErrorMessage(response, "保存失败，请检查工具信息"));
     const saved = await response.json() as AdminTool;
     setTools((items) => items.map((item) => item.id === saved.id ? saved : item));
     showToast(saved.status === "published" ? "工具已发布" : "工具草稿已保存");
@@ -1107,13 +1110,13 @@ function ToolWorkspace({
   async function uploadCover(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) return showToast("封面只能使用图片文件");
+    if (!file.type.startsWith("image/")) return showToast("Logo 只能使用图片文件");
     try {
       const uploaded = await uploadFile(file);
       patchTool({ coverUrl: uploaded.url });
-      showToast("封面已上传，保存工具后生效");
+      showToast("Logo 已上传，保存工具后生效");
     } catch {
-      showToast("封面上传失败");
+      showToast("Logo 上传失败");
     }
   }
 
@@ -1136,14 +1139,14 @@ function ToolWorkspace({
           <div className="editor-workspace product-workspace">
             <div className="product-form-grid">
               <label className="title-field product-title-field"><span>工具名称</span><input value={activeTool.title} onChange={(event) => patchTool({ title: event.target.value })} /></label>
-              <label><span>分类</span><select value={activeTool.category} onChange={(event) => patchTool({ category: event.target.value })}><option value="writing">写作</option><option value="design">设计</option><option value="productivity">效率</option><option value="other">其它</option></select></label>
+              <label><span>分类</span><select value={activeTool.category} onChange={(event) => patchTool({ category: event.target.value })}><option value="ai">AI</option><option value="writing">写作</option><option value="design">设计</option><option value="productivity">效率</option><option value="development">开发</option><option value="other">其它</option></select></label>
               <label><span>排序</span><input type="number" value={activeTool.sortOrder} onChange={(event) => patchTool({ sortOrder: Number(event.target.value) || 0 })} /></label>
               <label><span>发布状态</span><select value={activeTool.status} onChange={(event) => patchTool({ status: event.target.value as AdminTool["status"] })}><option value="draft">草稿</option><option value="published">公开发布</option></select></label>
             </div>
-            <label className="wide-field"><span>工具网址</span><input type="url" maxLength={2000} value={activeTool.url} onChange={(event) => patchTool({ url: event.target.value })} placeholder="https://" /></label>
-            <label className="wide-field"><span>一句话简介</span><input maxLength={500} value={activeTool.summary} onChange={(event) => patchTool({ summary: event.target.value })} /></label>
-            <div className="product-cover-row"><div className="product-cover-preview">{activeTool.coverUrl ? <img src={activeTool.coverUrl} alt="工具封面" /> : <Package size={30} />}</div><div><strong>工具封面</strong><p>可选，建议使用横向图片。</p><button type="button" onClick={() => coverInputRef.current?.click()}><ImagePlus size={15} />上传封面</button><input ref={coverInputRef} className="hidden-input" type="file" accept="image/*" onChange={(event) => { void uploadCover(event.target.files); event.target.value = ""; }} /></div></div>
-            <label className="wide-field"><span>工具介绍</span><textarea rows={12} maxLength={12000} value={activeTool.description} onChange={(event) => patchTool({ description: event.target.value })} /></label>
+            <label className="wide-field"><span>官网地址</span><input type="url" maxLength={2000} value={activeTool.url} onChange={(event) => patchTool({ url: event.target.value })} placeholder="https://example.com" /></label>
+            <label className="wide-field"><span>这是什么（一句话）</span><input maxLength={500} value={activeTool.summary} onChange={(event) => patchTool({ summary: event.target.value })} placeholder="例如：把零散灵感整理成文章大纲的 AI 写作工具" /></label>
+            <div className="product-cover-row tool-logo-row"><div className="product-cover-preview tool-logo-preview">{activeTool.coverUrl ? <img src={activeTool.coverUrl} alt={`${activeTool.title} Logo`} /> : <Package size={30} />}</div><div><strong>品牌 Logo</strong><p>可选，推荐 1:1 方形 PNG 或 WebP，前台卡片会自动裁切。</p><button type="button" onClick={() => coverInputRef.current?.click()}><ImagePlus size={15} />上传 Logo</button><input ref={coverInputRef} className="hidden-input" type="file" accept="image/*" onChange={(event) => { void uploadCover(event.target.files); event.target.value = ""; }} /></div></div>
+            <label className="wide-field"><span>我的使用说明（可选）</span><textarea rows={8} maxLength={12000} value={activeTool.description} onChange={(event) => patchTool({ description: event.target.value })} placeholder="可以写你用它解决什么问题、适合谁，以及你真实使用后的感受。" /></label>
           </div>
           <div className="toolbar product-toolbar"><span className="product-status-note">{activeTool.status === "published" ? "公开页可见" : "仅后台可见"}</span><span className="toolbar-fill" /><button className="danger-button" type="button" onClick={() => void deleteTool()}><Trash2 size={15} />删除</button><button className="primary" type="button" onClick={() => void saveTool()}><Save size={15} />保存</button></div>
         </> : <div className="empty-state">暂无工具，点击左上角加号创建第一个工具。</div>}
@@ -1154,12 +1157,26 @@ function ToolWorkspace({
 }
 
 function defaultToolPayload(): Omit<AdminTool, "id" | "slug" | "createdAt" | "updatedAt"> {
-  return { title: "未命名工具", summary: "请填写工具简介", description: "请填写工具介绍", category: "other", url: "https://", coverUrl: null, status: "draft", sortOrder: 0 };
+  return { title: "未命名工具", summary: "", description: "", category: "other", url: "", coverUrl: null, status: "draft", sortOrder: 0 };
 }
 
 function toolPayload(tool: AdminTool) {
   const { id: _id, slug: _slug, createdAt: _createdAt, updatedAt: _updatedAt, ...payload } = tool;
   return payload;
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+async function apiErrorMessage(response: Response, fallback: string): Promise<string> {
+  const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+  return payload?.error?.message || `${fallback}（${response.status}）`;
 }
 
 function DistributionWorkspace({

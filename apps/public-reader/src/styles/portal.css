@@ -953,63 +953,86 @@ svg {
 .tools-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 16px;
 }
 
 .tool-card {
   min-width: 0;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 310px;
+  padding: 20px;
   border: 1px solid var(--portal-line);
-  border-radius: 8px;
+  border-radius: 14px;
   background: var(--portal-panel);
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
 }
 
 .tool-card:hover {
   border-color: color-mix(in srgb, var(--portal-accent) 58%, var(--portal-line));
+  box-shadow: 0 16px 36px color-mix(in srgb, #000 18%, transparent);
+  transform: translateY(-2px);
 }
 
-.tool-card-cover {
-  height: 150px;
+.tool-card-header {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 13px;
+}
+
+.tool-card-logo {
+  width: 54px;
+  height: 54px;
   display: grid;
   place-items: center;
   overflow: hidden;
-  border-bottom: 1px solid var(--portal-line);
+  border: 1px solid var(--portal-line);
+  border-radius: 14px;
   background: var(--portal-bg);
 }
 
-.tool-card-cover img {
+.tool-card-logo img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
 .tool-card-mark {
+  display: grid;
+  place-items: center;
   color: var(--portal-accent);
 }
 
 .tool-card-mark svg {
-  width: 38px;
-  height: 38px;
+  width: 23px;
+  height: 23px;
 }
 
-.tool-card-body {
-  display: flex;
-  flex-direction: column;
-  min-height: 210px;
-  padding: 18px;
+.tool-card-identity {
+  min-width: 0;
 }
 
-.tool-card-topline {
+.tool-card-identity > div {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 7px;
 }
 
-.tool-card-topline > span {
+.tool-category {
   color: var(--portal-accent);
   font-size: 12px;
   font-weight: 750;
+}
+
+.tool-used-badge {
+  padding: 1px 6px;
+  border: 1px solid color-mix(in srgb, var(--portal-accent) 30%, var(--portal-line));
+  border-radius: 999px;
+  background: var(--portal-accent-soft);
+  color: var(--portal-accent);
+  font-size: 10px;
+  line-height: 1.6;
 }
 
 .tool-share-button {
@@ -1035,34 +1058,90 @@ svg {
 }
 
 .tool-card h2 {
-  margin: 15px 0 7px;
+  overflow: hidden;
+  margin: 3px 0 0;
   font-family: "Noto Serif SC", "Source Han Serif SC", "Songti SC", STSong, SimSun, serif;
-  font-size: 21px;
-  line-height: 1.4;
+  font-size: 19px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.tool-card p {
+.tool-card-summary {
+  display: -webkit-box;
+  overflow: hidden;
+  min-height: 50px;
+  margin: 18px 0 0;
+  color: var(--portal-text);
+  font-size: 15px;
+  line-height: 1.7;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.tool-card-note {
+  margin-top: 14px;
+  padding: 11px 12px;
+  border-left: 2px solid var(--portal-accent);
+  border-radius: 0 8px 8px 0;
+  background: var(--portal-bg);
+}
+
+.tool-card-note > span {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--portal-accent);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.tool-card-note p {
   display: -webkit-box;
   overflow: hidden;
   margin: 0;
   color: var(--portal-muted);
-  font-size: 14px;
+  font-size: 12px;
+  line-height: 1.6;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
 }
 
 .tool-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-top: auto;
+  padding-top: 18px;
 }
 
 .tool-card-footer .button {
-  width: 100%;
-  margin-top: 18px;
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding-inline: 13px;
 }
 
 .tool-card-footer .button svg {
   width: 15px;
   height: 15px;
+}
+
+.tool-site {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  color: var(--portal-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tool-site svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
 }
 
 .market-console {
@@ -2081,6 +2160,10 @@ svg {
 }
 
 @media (max-width: 680px) {
+  body.portal-page {
+    overflow-x: clip;
+  }
+
   .portal-container,
   .site-header-inner,
   .service-strip-inner,
@@ -2189,6 +2272,37 @@ svg {
 
   .tools-page-head h1 {
     font-size: 34px;
+  }
+
+  .tools-filters {
+    flex-wrap: nowrap;
+    margin-inline: -14px;
+    padding-inline: 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .tools-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tools-filters button {
+    flex: 0 0 auto;
+  }
+
+  .tool-card {
+    min-height: 330px;
+    padding: 18px;
+  }
+
+  .tool-card-footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .tool-card-footer .button {
+    width: 100%;
   }
 
   .product-dialog-actions,

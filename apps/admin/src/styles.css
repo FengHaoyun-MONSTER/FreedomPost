@@ -595,6 +595,16 @@ button:hover {
   object-fit: cover;
 }
 
+.tool-logo-row {
+  align-items: flex-start;
+}
+
+.tool-logo-preview {
+  width: 88px;
+  height: 88px;
+  border-radius: 18px;
+}
+
 .product-cover-row p {
   margin: 3px 0 10px;
   color: #667085;

@@ -213,6 +213,35 @@ describe("api app", () => {
     expect(publicTools.json().items).toMatchObject([{ title: "创作工具", url: "https://example.com/tool", status: "published" }]);
   });
 
+  it("creates incomplete tool drafts but requires a summary and official URL to publish", async () => {
+    const app = buildApp({ repository: new MemoryContentRepository() });
+    const cookie = await adminCookie(app);
+    const payload = {
+      title: "未命名工具",
+      summary: "",
+      description: "",
+      category: "other",
+      url: "",
+      coverUrl: null,
+      status: "draft",
+      sortOrder: 0
+    };
+
+    const draft = await app.inject({ method: "POST", url: "/api/admin/tools", headers: { cookie }, payload });
+    const invalidPublish = await app.inject({
+      method: "PUT",
+      url: `/api/admin/tools/${draft.json().id}`,
+      headers: { cookie },
+      payload: { ...payload, status: "published" }
+    });
+    await app.close();
+
+    expect(draft.statusCode).toBe(201);
+    expect(draft.json()).toMatchObject({ title: "未命名工具", url: "", status: "draft" });
+    expect(invalidPublish.statusCode).toBe(400);
+    expect(invalidPublish.json()).toMatchObject({ error: { code: "INVALID_TOOL" } });
+  });
+
   it("protects affiliate dashboards and snapshots referred orders", async () => {
     const app = buildApp({ repository: new MemoryContentRepository() });
     const admin = await adminCookie(app);

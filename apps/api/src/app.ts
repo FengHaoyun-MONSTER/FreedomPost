@@ -834,11 +834,15 @@ function normalizeToolInput(value: unknown): ToolInput | null {
   const summary = readText(input.summary, 500);
   const description = readText(input.description, 12_000);
   const category = readText(input.category, 32) || "other";
-  const url = readRequiredUrl(input.url);
+  const urlInput = readText(input.url, 2_000);
+  const parsedUrl = urlInput ? readRequiredUrl(urlInput) : "";
   const coverUrl = readOptionalUrl(input.coverUrl);
   const status = input.status === "published" ? "published" : input.status === "draft" ? "draft" : null;
   const sortOrder = readInteger(input.sortOrder, -100_000, 100_000);
-  if (!title || !summary || !description || !url || !status || sortOrder === null) return null;
+  if (!title || !status || sortOrder === null) return null;
+  if (urlInput && !parsedUrl) return null;
+  const url = parsedUrl ?? "";
+  if (status === "published" && (!summary || !url)) return null;
   return { title, summary, description, category, url, coverUrl, status, sortOrder };
 }
 

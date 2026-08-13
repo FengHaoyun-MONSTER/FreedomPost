@@ -516,9 +516,20 @@ async function hydrateTools() {
 
 function renderToolCard(tool: CreatorTool) {
   const cover = tool.coverUrl
-    ? `<img src="${escapeAttribute(tool.coverUrl)}" alt="${escapeAttribute(tool.title)}" />`
-    : `<span class="tool-card-mark"><i data-lucide="wrench"></i></span>`;
-  return `<article class="tool-card"><div class="tool-card-cover">${cover}</div><div class="tool-card-body"><div class="tool-card-topline"><span>${escapeHtml(toolCategoryLabel(tool.category))}</span><button class="tool-share-button" type="button" data-share-tool="${escapeAttribute(tool.slug)}" aria-label="分享 ${escapeAttribute(tool.title)}" title="分享"><i data-lucide="share-2"></i></button></div><h2>${escapeHtml(tool.title)}</h2><p>${escapeHtml(tool.summary)}</p><div class="tool-card-footer"><a class="button primary" href="${escapeAttribute(tool.url)}" target="_blank" rel="noopener noreferrer">访问工具 <i data-lucide="arrow-up-right"></i></a></div></div></article>`;
+    ? `<img src="${escapeAttribute(tool.coverUrl)}" alt="${escapeAttribute(tool.title)} Logo" loading="lazy" />`
+    : `<span class="tool-card-mark" aria-hidden="true"><i data-lucide="wrench"></i></span>`;
+  const note = tool.description.trim()
+    ? `<div class="tool-card-note"><span>我的用途</span><p>${escapeHtml(tool.description)}</p></div>`
+    : "";
+  return `<article class="tool-card"><header class="tool-card-header"><div class="tool-card-logo">${cover}</div><div class="tool-card-identity"><div><span class="tool-category">${escapeHtml(toolCategoryLabel(tool.category))}</span><span class="tool-used-badge">我用过</span></div><h2>${escapeHtml(tool.title)}</h2></div><button class="tool-share-button" type="button" data-share-tool="${escapeAttribute(tool.slug)}" aria-label="分享 ${escapeAttribute(tool.title)}" title="分享"><i data-lucide="share-2"></i></button></header><p class="tool-card-summary">${escapeHtml(tool.summary)}</p>${note}<footer class="tool-card-footer"><span class="tool-site"><i data-lucide="globe-2"></i>${escapeHtml(toolWebsiteLabel(tool.url))}</span><a class="button primary" href="${escapeAttribute(tool.url)}" target="_blank" rel="noopener noreferrer">访问官网 <i data-lucide="arrow-up-right"></i></a></footer></article>`;
+}
+
+function toolWebsiteLabel(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./, "");
+  } catch {
+    return "官方网站";
+  }
 }
 
 async function shareTool(tool: CreatorTool) {
@@ -919,7 +930,7 @@ function productCategoryLabel(category: string) {
 }
 
 function toolCategoryLabel(category: string) {
-  return ({ writing: "写作", design: "设计", productivity: "效率", other: "其它" } as Record<string, string>)[category] ?? "其它";
+  return ({ ai: "AI", writing: "写作", design: "设计", productivity: "效率", development: "开发", other: "其它" } as Record<string, string>)[category] ?? "其它";
 }
 
 function escapeHtml(value: string) {
