@@ -15,6 +15,12 @@ export function editorImageHtml(url: string, alt: string): string {
   return `<figure class="editor-image" data-fp-type="image"><a href="${safeUrl}" target="_blank" rel="noreferrer noopener"><img src="${safeUrl}" alt="${safeAlt}" /></a></figure>`;
 }
 
+export function editorImagesMarkdown(images: ReadonlyArray<{ src: string; alt: string }>): string {
+  return images
+    .map((image) => `![${escapeMarkdown(image.alt || defaultImageAlt)}](${image.src})`)
+    .join("\n\n");
+}
+
 export function editorYouTubeHtml(video: YouTubeVideo): string {
   const src = escapeAttribute(youtubeEmbedUrl(video));
   const start = Math.max(0, Math.floor(video.startSeconds));
@@ -29,4 +35,8 @@ function escapeAttribute(value: string): string {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;")
     .replaceAll("\n", "&#10;");
+}
+
+function escapeMarkdown(value: string): string {
+  return value.replaceAll("[", "\\[").replaceAll("]", "\\]").replaceAll("(", "\\(").replaceAll(")", "\\)");
 }

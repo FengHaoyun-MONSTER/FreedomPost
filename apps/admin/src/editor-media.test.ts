@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { editorImageHtml, editorYouTubeHtml, normalizeEditorImageAlt } from "./editor-media.js";
+import {
+  editorImageHtml,
+  editorImagesMarkdown,
+  editorYouTubeHtml,
+  normalizeEditorImageAlt
+} from "./editor-media.js";
 
 describe("editor image markup", () => {
   it("does not insert an uploaded image filename as visible article content", () => {
@@ -20,6 +25,18 @@ describe("editor image markup", () => {
   it("recognizes common image filename extensions", () => {
     expect(normalizeEditorImageAlt(" photo.WEBP ")).toBe("图片");
     expect(normalizeEditorImageAlt("screenshots/result.heic")).toBe("图片");
+  });
+
+  it("serializes every image when the browser nests consecutive pasted figures", () => {
+    const markdown = editorImagesMarkdown(
+      Array.from({ length: 10 }, (_, index) => ({
+        src: `https://pic.example.com/${index + 1}.webp`,
+        alt: `图片 ${index + 1}`
+      }))
+    );
+
+    expect(markdown.match(/!\[/g)).toHaveLength(10);
+    expect(markdown).toContain("https://pic.example.com/10.webp");
   });
 });
 

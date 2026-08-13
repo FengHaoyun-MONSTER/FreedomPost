@@ -417,6 +417,18 @@ button:hover {
   max-width: 100%;
 }
 
+.editor-media-placeholder {
+  margin: 16px 0;
+  padding: 18px;
+  border: 1px dashed #9db8aa;
+  border-radius: 8px;
+  background: #f3f8f4;
+  color: #527060;
+  font-family: ui-sans-serif, system-ui, "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  text-align: center;
+}
+
 .editor-youtube {
   position: relative;
   width: 100%;

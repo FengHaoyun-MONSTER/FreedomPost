@@ -19,7 +19,8 @@ import {
   Video
 } from "lucide-react";
 import { parseYouTubeDirective, parseYouTubeVideoInput, youtubeDirective } from "@freedompost/shared";
-import { editorImageHtml, editorYouTubeHtml } from "./editor-media.js";
+import { editorImageHtml, editorImagesMarkdown, editorYouTubeHtml } from "./editor-media.js";
+import { startPendingMediaInsertion } from "./pending-media-insertion.js";
 import { PendingTaskBarrier } from "./pending-task-barrier.js";
 import "./styles.css";
 
@@ -344,7 +345,9 @@ function App() {
     if (!activePost || !files?.length) return;
     try {
       await trackPendingMedia(
-        Promise.all([...files].map(fileToEditorHtml)).then((snippets) => insertHtmlAtCaret(snippets.join("")))
+        insertPendingMediaAtCaret(() =>
+          Promise.all([...files].map(fileToEditorHtml)).then((snippets) => snippets.join(""))
+        )
       );
       showToast(`已上传并插入 ${files.length} 个附件`);
     } catch {
@@ -362,7 +365,9 @@ function App() {
       event.preventDefault();
       try {
         await trackPendingMedia(
-          Promise.all(files.map(fileToEditorHtml)).then((snippets) => insertHtmlAtCaret(snippets.join("")))
+          insertPendingMediaAtCaret(() =>
+            Promise.all(files.map(fileToEditorHtml)).then((snippets) => snippets.join(""))
+          )
         );
         showToast("图片已上传并插入");
       } catch {
@@ -377,9 +382,10 @@ function App() {
     event.preventDefault();
     try {
       await trackPendingMedia(
-        pastedHtmlToEditorHtml(pastedHtml).then((htmlWithImages) => {
+        insertPendingMediaAtCaret(async () => {
+          const htmlWithImages = await pastedHtmlToEditorHtml(pastedHtml);
           if (!htmlWithImages) throw new Error("No supported images in pasted HTML");
-          insertHtmlAtCaret(htmlWithImages);
+          return htmlWithImages;
         })
       );
       showToast("图片已上传并插入");
@@ -396,6 +402,59 @@ function App() {
       () => setPendingMediaCount(pendingMediaRef.current.size)
     );
     return tracked;
+  }
+
+  function insertPendingMediaAtCaret(createHtml: () => Promise<string>): Promise<void> {
+    return startPendingMediaInsertion(createHtml, {
+      insertPlaceholder: insertMediaPlaceholderAtCaret,
+      replacePlaceholder: replaceMediaPlaceholder,
+      removePlaceholder: (placeholder) => placeholder.remove()
+    });
+  }
+
+  function insertMediaPlaceholderAtCaret(): HTMLDivElement {
+    const editor = editorRef.current;
+    if (!editor) throw new Error("Editor is unavailable");
+
+    const placeholder = document.createElement("div");
+    placeholder.className = "editor-media-placeholder";
+    placeholder.dataset.fpType = "pending-media";
+    placeholder.contentEditable = "false";
+    placeholder.textContent = "图片上传中…";
+
+    editor.focus();
+    const selection = window.getSelection();
+    if (selection?.rangeCount && editor.contains(selection.anchorNode)) {
+      const range = selection.getRangeAt(0);
+      const topLevelNode = closestEditorChild(selection.anchorNode, editor);
+      if (topLevelNode) topLevelNode.after(placeholder);
+      else {
+        range.deleteContents();
+        range.insertNode(placeholder);
+      }
+    } else {
+      editor.append(placeholder);
+    }
+
+    const nextRange = document.createRange();
+    nextRange.setStartAfter(placeholder);
+    nextRange.collapse(true);
+    selection?.removeAllRanges();
+    selection?.addRange(nextRange);
+    savedRangeRef.current = nextRange.cloneRange();
+    return placeholder;
+  }
+
+  function replaceMediaPlaceholder(placeholder: HTMLDivElement, html: string) {
+    const editor = editorRef.current;
+    if (!editor || !editor.contains(placeholder)) {
+      throw new Error("Media insertion point is no longer available");
+    }
+
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    placeholder.replaceWith(template.content);
+    syncEditorMarkdown();
   }
 
   function insertHtmlAtCaret(html: string) {
@@ -415,9 +474,9 @@ function App() {
 
     if (selection?.rangeCount && editor.contains(selection.anchorNode)) {
       const range = selection.getRangeAt(0);
-      const block = closestEditableBlock(selection.anchorNode, editor);
-      if (insertsRichBlock && block) {
-        block.after(fragment);
+      const topLevelNode = closestEditorChild(selection.anchorNode, editor);
+      if (insertsRichBlock && topLevelNode) {
+        topLevelNode.after(fragment);
       } else {
         range.deleteContents();
         range.insertNode(fragment);
@@ -524,10 +583,12 @@ function App() {
     showToast("YouTube 视频已插入");
   }
 
-  function closestEditableBlock(node: Node | null, editor: HTMLElement): HTMLElement | null {
-    const start = node instanceof HTMLElement ? node : node?.parentElement;
-    const block = start?.closest("p,h1,h2,h3,h4,h5,h6,li,blockquote,pre");
-    return block instanceof HTMLElement && editor.contains(block) ? block : null;
+  function closestEditorChild(node: Node | null, editor: HTMLElement): ChildNode | null {
+    let current = node;
+    while (current?.parentNode && current.parentNode !== editor) {
+      current = current.parentNode;
+    }
+    return current?.parentNode === editor ? (current as ChildNode) : null;
   }
 
   function syncEditorMarkdown() {
@@ -1424,10 +1485,16 @@ function nodeToMarkdown(node: Node): string {
     return "";
   }
 
+  if (node.matches('[data-fp-type="pending-media"]')) {
+    return "";
+  }
+
   if (node.matches("figure.editor-image")) {
-    const img = node.querySelector("img");
-    if (!img) return "";
-    return `![${escapeMarkdown(img.alt || "图片")}](${img.src})`;
+    const images = [...node.querySelectorAll("img")].map((image) => ({
+      src: image.src,
+      alt: image.alt || "图片"
+    }));
+    return editorImagesMarkdown(images);
   }
 
   if (node.matches("figure.editor-youtube")) {
