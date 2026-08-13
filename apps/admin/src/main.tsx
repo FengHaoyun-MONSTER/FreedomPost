@@ -15,9 +15,12 @@ import {
   Trash2,
   Type,
   Underline,
-  Upload
+  Upload,
+  Video
 } from "lucide-react";
-import { editorImageHtml } from "./editor-media.js";
+import { parseYouTubeDirective, parseYouTubeVideoInput, youtubeDirective } from "@freedompost/shared";
+import { editorImageHtml, editorYouTubeHtml } from "./editor-media.js";
+import { PendingTaskBarrier } from "./pending-task-barrier.js";
 import "./styles.css";
 
 type AdminPost = {
@@ -142,9 +145,12 @@ function App() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [workspace, setWorkspace] = useState<"posts" | "products" | "tools" | "distribution">("posts");
   const [toast, setToast] = useState<Toast | null>(null);
+  const [pendingMediaCount, setPendingMediaCount] = useState(0);
+  const [isSavingPost, setSavingPost] = useState(false);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const savedRangeRef = useRef<Range | null>(null);
+  const pendingMediaRef = useRef(new PendingTaskBarrier());
   const activePost = useMemo(() => posts.find((post) => post.id === activeId) ?? posts[0], [posts, activeId]);
 
   useEffect(() => {
@@ -274,23 +280,40 @@ function App() {
   }
 
   async function savePost() {
-    if (!activePost) return;
-    const markdown = editorRef.current ? editorHtmlToMarkdown(editorRef.current) : activePost.markdown;
-    const response = await fetch(`/api/admin/posts/${activePost.id}`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ title: activePost.title, markdown, visibility: activePost.visibility })
-    });
+    if (!activePost || isSavingPost) return;
+    setSavingPost(true);
 
-    if (!response.ok) {
-      showToast("保存失败");
-      return;
+    try {
+      if (pendingMediaRef.current.size > 0) {
+        showToast("正在等待图片上传完成…");
+      }
+
+      const { failureCount } = await pendingMediaRef.current.waitForIdle();
+      setPendingMediaCount(0);
+      if (failureCount > 0) {
+        showToast("有图片上传失败，文章尚未保存，请重试");
+        return;
+      }
+
+      const markdown = editorRef.current ? editorHtmlToMarkdown(editorRef.current) : activePost.markdown;
+      const response = await fetch(`/api/admin/posts/${activePost.id}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ title: activePost.title, markdown, visibility: activePost.visibility })
+      });
+
+      if (!response.ok) {
+        showToast("保存失败");
+        return;
+      }
+
+      const saved = (await response.json()) as AdminPost;
+      setPosts((items) => items.map((item) => (item.id === saved.id ? saved : item)));
+      showToast(saved.visibility === "private" ? "保存成功，仅自己可见" : "保存成功，文章已公开");
+    } finally {
+      setSavingPost(false);
     }
-
-    const saved = (await response.json()) as AdminPost;
-    setPosts((items) => items.map((item) => (item.id === saved.id ? saved : item)));
-    showToast(saved.visibility === "private" ? "保存成功，仅自己可见" : "保存成功，文章已公开");
   }
 
   async function deletePost() {
@@ -320,8 +343,9 @@ function App() {
   async function handleAttachmentFiles(files: FileList | null) {
     if (!activePost || !files?.length) return;
     try {
-      const snippets = await Promise.all([...files].map(fileToEditorHtml));
-      insertHtmlAtCaret(snippets.join(""));
+      await trackPendingMedia(
+        Promise.all([...files].map(fileToEditorHtml)).then((snippets) => insertHtmlAtCaret(snippets.join("")))
+      );
       showToast(`已上传并插入 ${files.length} 个附件`);
     } catch {
       showToast("附件上传失败");
@@ -337,8 +361,9 @@ function App() {
     if (files.length) {
       event.preventDefault();
       try {
-        const snippets = await Promise.all(files.map(fileToEditorHtml));
-        insertHtmlAtCaret(snippets.join(""));
+        await trackPendingMedia(
+          Promise.all(files.map(fileToEditorHtml)).then((snippets) => insertHtmlAtCaret(snippets.join("")))
+        );
         showToast("图片已上传并插入");
       } catch {
         showToast("图片上传失败");
@@ -346,12 +371,31 @@ function App() {
       return;
     }
 
-    const htmlWithImages = await pastedHtmlToEditorHtml(event.clipboardData.getData("text/html"));
-    if (!htmlWithImages) return;
+    const pastedHtml = event.clipboardData.getData("text/html");
+    if (!pastedHtml || !/<img[\s>]/i.test(pastedHtml)) return;
 
     event.preventDefault();
-    insertHtmlAtCaret(htmlWithImages);
-    showToast("图片已上传并插入");
+    try {
+      await trackPendingMedia(
+        pastedHtmlToEditorHtml(pastedHtml).then((htmlWithImages) => {
+          if (!htmlWithImages) throw new Error("No supported images in pasted HTML");
+          insertHtmlAtCaret(htmlWithImages);
+        })
+      );
+      showToast("图片已上传并插入");
+    } catch {
+      showToast("图片上传失败");
+    }
+  }
+
+  function trackPendingMedia<T>(task: Promise<T>): Promise<T> {
+    const tracked = pendingMediaRef.current.track(task);
+    setPendingMediaCount(pendingMediaRef.current.size);
+    void tracked.then(
+      () => setPendingMediaCount(pendingMediaRef.current.size),
+      () => setPendingMediaCount(pendingMediaRef.current.size)
+    );
+    return tracked;
   }
 
   function insertHtmlAtCaret(html: string) {
@@ -365,7 +409,9 @@ function App() {
     template.innerHTML = html;
     const fragment = template.content;
     const lastNode = fragment.lastChild;
-    const insertsRichBlock = Boolean(fragment.querySelector("figure.editor-image,.editor-attachment"));
+    const insertsRichBlock = Boolean(
+      fragment.querySelector("figure.editor-image,figure.editor-youtube,.editor-attachment")
+    );
 
     if (selection?.rangeCount && editor.contains(selection.anchorNode)) {
       const range = selection.getRangeAt(0);
@@ -461,6 +507,21 @@ function App() {
 
   function insertCodeBlock() {
     insertHtmlAtCaret('<pre data-lang="ts"><code>// code</code></pre><p><br></p>');
+  }
+
+  function insertYouTubeVideo() {
+    const input = prompt("粘贴 YouTube 视频链接");
+    if (!input) return;
+
+    const video = parseYouTubeVideoInput(input);
+    if (!video) {
+      showToast("无法识别这个 YouTube 视频链接");
+      return;
+    }
+
+    restoreEditorSelection();
+    insertHtmlAtCaret(`${editorYouTubeHtml(video)}<p><br></p>`);
+    showToast("YouTube 视频已插入");
   }
 
   function closestEditableBlock(node: Node | null, editor: HTMLElement): HTMLElement | null {
@@ -683,6 +744,16 @@ function App() {
               >
                 <Code2 size={16} />
               </button>
+              <button
+                className="icon-button"
+                type="button"
+                title="插入 YouTube 视频"
+                aria-label="插入 YouTube 视频"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={insertYouTubeVideo}
+              >
+                <Video size={17} />
+              </button>
               <label className="toolbar-field">
                 <span>字号</span>
                 <select
@@ -744,9 +815,13 @@ function App() {
                 <Trash2 size={15} />
                 删除
               </button>
-              <button className="primary" type="button" onClick={savePost}>
+              <button className="primary" type="button" onClick={savePost} disabled={isSavingPost}>
                 <Save size={15} />
-                保存
+                {isSavingPost
+                  ? "保存中…"
+                  : pendingMediaCount > 0
+                    ? `等待媒体（${pendingMediaCount}）`
+                    : "保存"}
               </button>
             </div>
           </>
@@ -1287,6 +1362,13 @@ function markdownToEditorHtml(markdown: string): string {
       continue;
     }
 
+    const youtube = parseYouTubeDirective(line);
+    if (youtube) {
+      flushParagraph();
+      html.push(editorYouTubeHtml(youtube));
+      continue;
+    }
+
     const image = line.match(/^!\[(.*)]\((.*)\)$/);
     if (image) {
       flushParagraph();
@@ -1348,6 +1430,13 @@ function nodeToMarkdown(node: Node): string {
     return `![${escapeMarkdown(img.alt || "图片")}](${img.src})`;
   }
 
+  if (node.matches("figure.editor-youtube")) {
+    const video = parseYouTubeVideoInput(node.dataset.videoId ?? "");
+    if (!video) return "";
+    video.startSeconds = Number.parseInt(node.dataset.start ?? "0", 10) || 0;
+    return youtubeDirective(video);
+  }
+
   if (node.matches(".editor-attachment")) {
     const name = node.dataset.name || node.querySelector("span")?.textContent?.trim() || "附件";
     const href = node.dataset.href || node.querySelector("a")?.getAttribute("href") || "#";
@@ -1359,7 +1448,7 @@ function nodeToMarkdown(node: Node): string {
     return `![${escapeMarkdown(img.alt || "图片")}](${img.src})`;
   }
 
-  if (node.querySelector("figure.editor-image,img,.editor-attachment")) {
+  if (node.querySelector("figure.editor-image,figure.editor-youtube,img,.editor-attachment")) {
     const childMarkdown = [...node.childNodes].map(nodeToMarkdown).filter((value) => value.trim());
     if (childMarkdown.length) {
       return childMarkdown.join("\n\n");
@@ -1407,7 +1496,7 @@ function inlineNodeToMarkdown(node: Node): string {
     return `![${escapeMarkdown(img.alt || "图片")}](${img.src})`;
   }
 
-  if (node.matches("figure.editor-image,.editor-attachment")) {
+  if (node.matches("figure.editor-image,figure.editor-youtube,.editor-attachment")) {
     return nodeToMarkdown(node);
   }
 

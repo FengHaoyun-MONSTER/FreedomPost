@@ -3,7 +3,13 @@ import footnote from "markdown-it-footnote";
 import mark from "markdown-it-mark";
 import taskLists from "markdown-it-task-lists";
 import { sanitizeArticleHtml } from "@freedompost/security";
-import type { ArticleMeta, TocItem } from "@freedompost/shared";
+import {
+  parseYouTubeDirective,
+  youtubeEmbedUrl,
+  youtubeWatchUrl,
+  type ArticleMeta,
+  type TocItem
+} from "@freedompost/shared";
 
 export interface RenderArticleInput {
   slug: string;
@@ -29,7 +35,7 @@ export function renderMarkdownArticle(input: RenderArticleInput): RenderedArticl
   const toc: TocItem[] = [];
   const usedIds = new Map<string, number>();
   const md = createMarkdownRenderer(toc, usedIds);
-  const html = renderAttachmentCards(sanitizeArticleHtml(md.render(input.markdown)));
+  const html = renderYouTubeEmbeds(renderAttachmentCards(sanitizeArticleHtml(md.render(input.markdown))));
   const searchText = extractSearchText(html);
   const excerpt = makeExcerpt(searchText);
   const meta: ArticleMeta = {
@@ -155,6 +161,18 @@ export function renderAttachmentCards(html: string): string {
     /<p><a href="([^"]+)"(?:\s+target="[^"]*")?(?:\s+rel="[^"]*")?>(?:附件:|附件：)\s*([^<]+)<\/a><\/p>/g,
     (_match, href: string, filename: string) =>
       `<div class="attachment-card"><span>${escapeHtml(filename)}</span><a href="${href}" target="_blank" rel="noreferrer noopener" download>下载 / 查看</a></div>`
+  );
+}
+
+export function renderYouTubeEmbeds(html: string): string {
+  return html.replace(
+    /<p>(::youtube\[[A-Za-z0-9_-]{11}(?:\?start=\d+)?])<\/p>/g,
+    (match, directive: string) => {
+      const video = parseYouTubeDirective(directive);
+      if (!video) return match;
+
+      return `<figure class="youtube-embed"><div class="youtube-player"><iframe src="${youtubeEmbedUrl(video)}" title="YouTube 视频播放器" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe></div><figcaption><a class="youtube-watch-link" href="${escapeHtml(youtubeWatchUrl(video))}" target="_blank" rel="noreferrer noopener">在 YouTube 官方页面观看 ↗</a></figcaption></figure>`;
+    }
   );
 }
 

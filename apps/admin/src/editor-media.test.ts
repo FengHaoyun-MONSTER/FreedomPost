@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { editorImageHtml, normalizeEditorImageAlt } from "./editor-media.js";
+import { editorImageHtml, editorYouTubeHtml, normalizeEditorImageAlt } from "./editor-media.js";
 
 describe("editor image markup", () => {
   it("does not insert an uploaded image filename as visible article content", () => {
@@ -20,5 +20,16 @@ describe("editor image markup", () => {
   it("recognizes common image filename extensions", () => {
     expect(normalizeEditorImageAlt(" photo.WEBP ")).toBe("图片");
     expect(normalizeEditorImageAlt("screenshots/result.heic")).toBe("图片");
+  });
+});
+
+describe("editor YouTube markup", () => {
+  it("uses the privacy-enhanced YouTube player", () => {
+    const html = editorYouTubeHtml({ videoId: "dQw4w9WgXcQ", startSeconds: 62 });
+
+    expect(html).toContain('class="editor-youtube"');
+    expect(html).toContain('data-video-id="dQw4w9WgXcQ"');
+    expect(html).toContain('src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=62"');
+    expect(html).toContain("allowfullscreen");
   });
 });

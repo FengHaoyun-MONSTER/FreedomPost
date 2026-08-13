@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseYouTubeVideoInput, youtubeDirective } from "@freedompost/shared";
 import { renderMarkdownArticle } from "./index.js";
 
 describe("renderMarkdownArticle", () => {
@@ -62,5 +63,70 @@ describe("renderMarkdownArticle", () => {
     expect(result.html).toContain("<u>underlined</u>");
     expect(result.html).not.toContain("onclick");
     expect(result.html).not.toContain("bad-class");
+  });
+
+  it("renders every image in an image-heavy article without imposing a count limit", () => {
+    const markdown = Array.from(
+      { length: 12 },
+      (_, index) => `![图片 ${index + 1}](https://pic.example.com/${index + 1}.webp)`
+    ).join("\n\n");
+    const result = renderMarkdownArticle({
+      slug: "image-heavy",
+      title: "Image-heavy article",
+      markdown,
+      createdAt: "2026-07-02T00:00:00.000Z",
+      updatedAt: "2026-07-02T00:00:00.000Z"
+    });
+
+    expect(result.html.match(/<img\b/g)).toHaveLength(12);
+    expect(result.html).toContain("https://pic.example.com/12.webp");
+  });
+
+  it("renders a responsive privacy-enhanced YouTube player", () => {
+    const result = renderMarkdownArticle({
+      slug: "video",
+      title: "Video",
+      markdown: "::youtube[dQw4w9WgXcQ?start=62]",
+      createdAt: "2026-07-02T00:00:00.000Z",
+      updatedAt: "2026-07-02T00:00:00.000Z"
+    });
+
+    expect(result.html).toContain('class="youtube-embed"');
+    expect(result.html).toContain('src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?start=62"');
+    expect(result.html).toContain('href="https://www.youtube.com/watch?v=dQw4w9WgXcQ&amp;t=62s"');
+    expect(result.html).toContain("在 YouTube 官方页面观看");
+    expect(result.html).toContain("allowfullscreen");
+  });
+
+  it("does not allow arbitrary iframe HTML", () => {
+    const result = renderMarkdownArticle({
+      slug: "unsafe-video",
+      title: "Unsafe video",
+      markdown: '<iframe src="https://evil.example/embed"></iframe>',
+      createdAt: "2026-07-02T00:00:00.000Z",
+      updatedAt: "2026-07-02T00:00:00.000Z"
+    });
+
+    expect(result.html).not.toContain("<iframe");
+    expect(result.html).not.toContain("evil.example");
+  });
+});
+
+describe("YouTube link parsing", () => {
+  it.each([
+    ["https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1m2s", 62],
+    ["https://youtu.be/dQw4w9WgXcQ?t=90", 90],
+    ["https://www.youtube.com/shorts/dQw4w9WgXcQ", 0],
+    ["youtube.com/embed/dQw4w9WgXcQ?start=12", 12]
+  ])("accepts %s", (input, startSeconds) => {
+    const video = parseYouTubeVideoInput(input);
+
+    expect(video).toEqual({ videoId: "dQw4w9WgXcQ", startSeconds });
+    expect(youtubeDirective(video!)).toContain("::youtube[dQw4w9WgXcQ");
+  });
+
+  it("rejects non-YouTube and malformed links", () => {
+    expect(parseYouTubeVideoInput("https://example.com/watch?v=dQw4w9WgXcQ")).toBeNull();
+    expect(parseYouTubeVideoInput("https://youtube.com/watch?v=too-short")).toBeNull();
   });
 });
