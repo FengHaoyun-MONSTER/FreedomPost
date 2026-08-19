@@ -38,6 +38,7 @@ import {
 } from "@freedompost/shared";
 import { editorCalloutHtml } from "./editor-callout.js";
 import { editorImageHtml, editorImagesMarkdown, editorYouTubeHtml } from "./editor-media.js";
+import { sanitizePastedEditorHtml } from "./editor-paste.js";
 import { startPendingMediaInsertion } from "./pending-media-insertion.js";
 import { PendingTaskBarrier } from "./pending-task-barrier.js";
 import "./styles.css";
@@ -427,15 +428,21 @@ function App() {
     }
 
     const pastedHtml = event.clipboardData.getData("text/html");
-    if (!pastedHtml || !/<img[\s>]/i.test(pastedHtml)) return;
+    if (!pastedHtml) return;
 
     event.preventDefault();
+    if (!/<img[\s>]/i.test(pastedHtml)) {
+      const sanitizedHtml = sanitizePastedEditorHtml(pastedHtml, location.href);
+      if (sanitizedHtml) insertPastedHtmlAtCaret(sanitizedHtml);
+      return;
+    }
+
     try {
       await trackPendingMedia(
         insertPendingMediaAtCaret(async () => {
           const htmlWithImages = await pastedHtmlToEditorHtml(pastedHtml);
           if (!htmlWithImages) throw new Error("No supported images in pasted HTML");
-          return htmlWithImages;
+          return sanitizePastedEditorHtml(htmlWithImages, location.href);
         })
       );
       showToast("图片已上传并插入");
@@ -543,6 +550,18 @@ function App() {
       editor.append(fragment);
     }
 
+    syncEditorMarkdown();
+  }
+
+  function insertPastedHtmlAtCaret(html: string) {
+    const editor = editorRef.current;
+    if (!activePost || !editor) return;
+
+    editor.focus();
+    if (!document.execCommand("insertHTML", false, html)) {
+      insertHtmlAtCaret(html);
+      return;
+    }
     syncEditorMarkdown();
   }
 
