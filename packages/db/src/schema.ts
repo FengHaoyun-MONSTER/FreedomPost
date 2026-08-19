@@ -17,6 +17,9 @@ import {
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
+export const POST_INITIAL_VIEW_COUNT = 100;
+export const POST_VIEW_INCREMENT = 100;
+
 export const posts = pgTable(
   "posts",
   {
@@ -33,7 +36,7 @@ export const posts = pgTable(
     currency: varchar("currency", { length: 8 }).notNull().default("CNY"),
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
-    viewCount: bigint("view_count", { mode: "number" }).notNull().default(0),
+    viewCount: bigint("view_count", { mode: "number" }).notNull().default(POST_INITIAL_VIEW_COUNT),
     commentCount: bigint("comment_count", { mode: "number" }).notNull().default(0),
     attachmentCount: bigint("attachment_count", { mode: "number" }).notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

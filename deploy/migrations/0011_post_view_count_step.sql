@@ -1,0 +1,2 @@
+ALTER TABLE posts
+  ALTER COLUMN view_count SET DEFAULT 100;
