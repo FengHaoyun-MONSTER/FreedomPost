@@ -15,7 +15,17 @@ export const portalNavItems = [
   { id: "about", href: "/about/", label: "关于" }
 ] as const;
 
-export type PortalPageId = (typeof portalNavItems)[number]["id"];
+export const portalMobileNavItems = [
+  { id: "home", href: "/", label: "首页", icon: "house" },
+  { id: "articles", href: "/articles/", label: "阅读", icon: "book-open" },
+  { id: "market", href: "/market/", label: "商城", icon: "shopping-bag" },
+  { id: "earn", href: "/earn/", label: "分享", icon: "share-2" },
+  { id: "account", href: "/account/", label: "我的", icon: "user-round" }
+] as const;
+
+export type PortalPageId =
+  | (typeof portalNavItems)[number]["id"]
+  | (typeof portalMobileNavItems)[number]["id"];
 
 export const legacyPortalRedirects = {
   "/topics/": {
@@ -30,6 +40,13 @@ export function portalActivePath(pathname: string): string {
   const normalizedPath = normalizeDirectoryPath(pathname);
   if (normalizedPath.startsWith("/p/")) return "/articles/";
   return legacyPortalRedirects[normalizedPath as keyof typeof legacyPortalRedirects]?.destination ?? normalizedPath;
+}
+
+export function portalMobileActivePath(pathname: string): string {
+  const activePath = portalActivePath(pathname);
+  return ["/tools/", "/benefit/", "/guide/", "/about/"].includes(activePath)
+    ? "/account/"
+    : activePath;
 }
 
 function normalizeDirectoryPath(pathname: string): string {

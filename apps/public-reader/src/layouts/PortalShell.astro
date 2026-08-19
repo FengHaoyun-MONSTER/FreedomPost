@@ -1,27 +1,35 @@
 ---
 import "../styles/portal.css";
-import { portalNavItems, type PortalPageId } from "../lib/portal-routes.js";
+import {
+  portalMobileActivePath,
+  portalMobileNavItems,
+  portalNavItems,
+  type PortalPageId
+} from "../lib/portal-routes.js";
 
 interface Props {
   activePage: PortalPageId;
   title: string;
   description: string;
   hideFooter?: boolean;
+  noindex?: boolean;
 }
 
-const { activePage, title, description, hideFooter = false } = Astro.props;
+const { activePage, title, description, hideFooter = false, noindex = false } = Astro.props;
 const siteName = "FreedomPost";
 const pageTitle = activePage === "home" ? siteName : `${title} - ${siteName}`;
 const canonicalUrl = new URL(Astro.url.pathname, Astro.site ?? "https://example.com").toString();
+const mobileActivePath = portalMobileActivePath(Astro.url.pathname);
 ---
 
 <!doctype html>
 <html lang="zh-CN" data-theme="dark">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{pageTitle}</title>
     <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex,nofollow" />}
     <link rel="canonical" href={canonicalUrl} />
     <meta property="og:site_name" content={siteName} />
     <meta property="og:title" content={pageTitle} />
@@ -88,6 +96,17 @@ const canonicalUrl = new URL(Astro.url.pathname, Astro.site ?? "https://example.
         </nav>
       </div>
     </footer>
+
+    <nav class="mobile-bottom-nav" aria-label="移动端主导航">
+      {
+        portalMobileNavItems.map((item) => (
+          <a class:list={["mobile-bottom-link", { active: mobileActivePath === item.href }]} href={item.href} data-portal-route aria-current={mobileActivePath === item.href ? "page" : undefined}>
+            <i data-lucide={item.icon}></i>
+            <span>{item.label}</span>
+          </a>
+        ))
+      }
+    </nav>
 
     <div id="portalToast" class="portal-toast" role="status" aria-live="polite"></div>
     <script>

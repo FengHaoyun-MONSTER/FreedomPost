@@ -8,6 +8,13 @@ export interface PortalPageLifecycle {
   unmount(): void;
 }
 
+export function eventPathIncludes(
+  event: Pick<Event, "composedPath">,
+  target: EventTarget
+): boolean {
+  return event.composedPath().includes(target);
+}
+
 export function createPortalPageLifecycle(
   initializers: readonly PortalPageInitializer[]
 ): PortalPageLifecycle {

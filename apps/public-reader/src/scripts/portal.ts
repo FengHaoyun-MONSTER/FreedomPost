@@ -7,8 +7,8 @@ import {
   readArticleSlugFromPath,
   referralStorageKey
 } from "../lib/article-links.js";
-import { portalActivePath } from "../lib/portal-routes.js";
-import { createPortalPageLifecycle } from "../lib/portal-page-lifecycle.js";
+import { portalActivePath, portalMobileActivePath } from "../lib/portal-routes.js";
+import { createPortalPageLifecycle, eventPathIncludes } from "../lib/portal-page-lifecycle.js";
 
 type PostListItem = {
   slug: string;
@@ -104,6 +104,12 @@ const portalPageLifecycle = createPortalPageLifecycle([
     if (!benefitRoot) return;
     const { initializeBenefitPage } = await import("./benefit.js");
     return initializeBenefitPage(benefitRoot);
+  },
+  async (root) => {
+    const accountRoot = root.querySelector<HTMLElement>("[data-account-root]");
+    if (!accountRoot) return;
+    const { initializeAccountPage } = await import("./account.js");
+    return initializeAccountPage(accountRoot);
   }
 ]);
 
@@ -149,9 +155,12 @@ function bindNavigation() {
   document.addEventListener("click", (event) => {
     if (!primaryNav?.classList.contains("open")) return;
     const target = event.target as Node;
-    if (primaryNav.contains(target) || navToggle?.contains(target)) return;
+    if (primaryNav.contains(target) || (navToggle && eventPathIncludes(event, navToggle))) return;
     primaryNav.classList.remove("open");
     navToggle?.setAttribute("aria-expanded", "false");
+    navToggle?.setAttribute("aria-label", "打开导航");
+    if (navToggle) navToggle.innerHTML = '<i data-lucide="menu"></i>';
+    createPortalIcons();
   });
 }
 
@@ -307,6 +316,15 @@ function syncPortalMetadata(nextDocument: Document): void {
       if (value !== null) current.setAttribute(attribute, value);
     }
   }
+  const currentRobots = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+  const nextRobots = nextDocument.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+  if (!nextRobots) {
+    currentRobots?.remove();
+  } else if (currentRobots) {
+    currentRobots.content = nextRobots.content;
+  } else {
+    document.head.append(nextRobots.cloneNode(true));
+  }
 }
 
 function closePrimaryNavigation(): void {
@@ -353,9 +371,16 @@ function setPortalText(root: ParentNode, selector: string, value: string): void 
 
 function updateActiveNavigation(pathname: string) {
   const activePath = portalActivePath(pathname);
+  const mobileActivePath = portalMobileActivePath(pathname);
   document.querySelectorAll<HTMLAnchorElement>(".nav-link").forEach((link) => {
     const linkPath = new URL(link.href, location.href).pathname;
     const active = linkPath === activePath;
+    link.classList.toggle("active", active);
+    if (active) link.setAttribute("aria-current", "page");
+    else link.removeAttribute("aria-current");
+  });
+  document.querySelectorAll<HTMLAnchorElement>(".mobile-bottom-link").forEach((link) => {
+    const active = new URL(link.href, location.href).pathname === mobileActivePath;
     link.classList.toggle("active", active);
     if (active) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
