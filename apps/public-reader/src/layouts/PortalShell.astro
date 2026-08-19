@@ -51,7 +51,8 @@ const canonicalUrl = new URL(Astro.url.pathname, Astro.site ?? "https://example.
           {
             portalNavItems.map((item) => (
               <a class:list={["nav-link", "className" in item ? item.className : undefined, { active: activePage === item.id }]} href={item.href} data-portal-route aria-current={activePage === item.id ? "page" : undefined}>
-                {item.label}
+                <span class="nav-link-label">{item.label}</span>
+                {"tagline" in item && <small class="earn-nav-tagline">{item.tagline}</small>}
               </a>
             ))
           }

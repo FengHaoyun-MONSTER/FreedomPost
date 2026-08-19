@@ -7,6 +7,14 @@ import {
 } from "./portal-routes.js";
 
 describe("portal routes", () => {
+  it("defines the lifetime earnings tagline for the earn navigation entry", () => {
+    expect(portalNavItems.find((item) => item.id === "earn")).toMatchObject({
+      href: "/earn/",
+      label: "分享赚钱",
+      tagline: "一次分享终身收益"
+    });
+  });
+
   it("replaces the topics navigation entry with webmaster benefit", () => {
     expect(portalNavItems).toContainEqual({
       id: "benefit",
