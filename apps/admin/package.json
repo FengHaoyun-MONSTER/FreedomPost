@@ -21,6 +21,7 @@
   "devDependencies": {
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "happy-dom": "^20.11.2",
     "typescript": "latest"
   }
 }
