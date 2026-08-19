@@ -19,7 +19,7 @@ export const portalMobileNavItems = [
   { id: "home", href: "/", label: "首页", icon: "house" },
   { id: "articles", href: "/articles/", label: "阅读", icon: "book-open" },
   { id: "market", href: "/market/", label: "商城", icon: "shopping-bag" },
-  { id: "earn", href: "/earn/", label: "分享", icon: "share-2" },
+  { id: "earn", href: "/earn/", label: "赚钱", icon: "share-2" },
   { id: "account", href: "/account/", label: "我的", icon: "user-round" }
 ] as const;
 
