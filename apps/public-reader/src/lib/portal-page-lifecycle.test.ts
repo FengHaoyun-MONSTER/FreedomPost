@@ -1,7 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
-import { createPortalPageLifecycle, type PortalPageCleanup } from "./portal-page-lifecycle.js";
+import {
+  createPortalPageLifecycle,
+  eventPathIncludes,
+  type PortalPageCleanup
+} from "./portal-page-lifecycle.js";
 
 describe("Portal partial-page lifecycle", () => {
+  it("recognizes a navigation toggle from the stable composed event path", () => {
+    const toggle = {} as EventTarget;
+    const replacedIcon = {} as EventTarget;
+
+    expect(eventPathIncludes({ composedPath: () => [replacedIcon, toggle] }, toggle)).toBe(true);
+    expect(eventPathIncludes({ composedPath: () => [replacedIcon] }, toggle)).toBe(false);
+  });
+
   it("disposes the previous page before mounting the next page", async () => {
     const events: string[] = [];
     const lifecycle = createPortalPageLifecycle([

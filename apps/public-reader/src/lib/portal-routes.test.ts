@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   legacyPortalRedirects,
   portalActivePath,
+  portalMobileActivePath,
+  portalMobileNavItems,
   portalNavItems,
   portalSitemapPaths
 } from "./portal-routes.js";
@@ -13,6 +15,16 @@ describe("portal routes", () => {
       label: "分享赚钱",
       tagline: "一次分享终身收益"
     });
+  });
+
+  it("defines the focused five-item mobile navigation", () => {
+    expect(portalMobileNavItems).toEqual([
+      { id: "home", href: "/", label: "首页", icon: "house" },
+      { id: "articles", href: "/articles/", label: "阅读", icon: "book-open" },
+      { id: "market", href: "/market/", label: "商城", icon: "shopping-bag" },
+      { id: "earn", href: "/earn/", label: "分享", icon: "share-2" },
+      { id: "account", href: "/account/", label: "我的", icon: "user-round" }
+    ]);
   });
 
   it("replaces the topics navigation entry with webmaster benefit", () => {
@@ -36,6 +48,13 @@ describe("portal routes", () => {
 
   it("maps article permalinks back to the articles navigation entry", () => {
     expect(portalActivePath("/p/a-post-slug")).toBe("/articles/");
+  });
+
+  it("groups secondary service routes under the mobile account navigation", () => {
+    for (const path of ["/tools/", "/benefit/", "/guide/", "/about/"]) {
+      expect(portalMobileActivePath(path)).toBe("/account/");
+    }
+    expect(portalMobileActivePath("/market/")).toBe("/market/");
   });
 
   it("publishes only the canonical benefit route in the sitemap", () => {

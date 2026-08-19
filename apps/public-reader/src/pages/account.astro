@@ -1,0 +1,97 @@
+---
+import PortalShell from "../layouts/PortalShell.astro";
+---
+
+<PortalShell
+  activePage="account"
+  title="我的"
+  description="管理 FreedomPost 读者账户、订单和已购文章。"
+  noindex={true}
+>
+  <section class="account-page" data-account-root>
+    <header class="account-heading">
+      <p class="section-kicker">Reader center</p>
+      <h1>我的</h1>
+      <p>一个入口管理账户、订单、已购文章和常用服务。</p>
+    </header>
+
+    <section class="account-state account-loading" data-account-loading aria-live="polite">
+      <span class="account-loading-dot"></span>
+      正在读取当前浏览器的登录状态
+    </section>
+
+    <section class="account-state account-guest" data-account-guest hidden>
+      <div>
+        <span class="account-avatar"><i data-lucide="user-round"></i></span>
+        <p class="section-kicker">Guest</p>
+        <h2>登录后查看订单与已购文章</h2>
+        <p>支持邮箱或任意用户名注册，无需邮箱或短信验证码。</p>
+      </div>
+      <div class="account-auth-actions">
+        <button class="button primary" type="button" data-account-login>登录</button>
+        <button class="button secondary" type="button" data-account-register>注册</button>
+      </div>
+    </section>
+
+    <section class="account-state account-error" data-account-error hidden role="alert">
+      <h2>暂时无法加载账户</h2>
+      <p data-account-error-message>请稍后重试。</p>
+      <button class="button secondary" type="button" data-account-retry>重新加载</button>
+    </section>
+
+    <div data-account-authenticated hidden>
+      <section class="account-profile-card">
+        <span class="account-avatar"><i data-lucide="user-round"></i></span>
+        <div>
+          <p class="section-kicker">Reader account</p>
+          <h2 data-account-name></h2>
+          <p>登录状态仅保存在当前浏览器。</p>
+        </div>
+        <button class="account-logout" type="button" data-account-logout>退出登录</button>
+      </section>
+
+      <section class="account-metrics" aria-label="账户概览">
+        <article><strong data-account-purchased-count>0</strong><span>已购文章</span></article>
+        <article><strong data-account-pending-count>0</strong><span>待确认订单</span></article>
+        <article><strong data-account-total-count>0</strong><span>全部订单</span></article>
+      </section>
+
+      <nav class="account-quick-links" aria-label="常用入口">
+        <a href="/earn/" data-portal-route><i data-lucide="share-2"></i><span><strong>分享赚钱</strong><small>查看终身收益</small></span><i data-lucide="chevron-right"></i></a>
+        <a href="/benefit/" data-portal-route><i data-lucide="gift"></i><span><strong>站长福利</strong><small>领取专属福利</small></span><i data-lucide="chevron-right"></i></a>
+        <a href="/tools/" data-portal-route><i data-lucide="wrench"></i><span><strong>常用工具</strong><small>快速打开工具箱</small></span><i data-lucide="chevron-right"></i></a>
+        <a href="/guide/" data-portal-route><i data-lucide="circle-help"></i><span><strong>使用指南</strong><small>了解购买与阅读流程</small></span><i data-lucide="chevron-right"></i></a>
+      </nav>
+
+      <section class="account-section" aria-labelledby="purchasedHeading">
+        <div class="account-section-heading">
+          <div><p class="section-kicker">Library</p><h2 id="purchasedHeading">已购文章</h2></div>
+          <a href="/articles/" data-portal-route>继续阅读</a>
+        </div>
+        <div class="account-purchased-list" data-account-purchased-list></div>
+      </section>
+
+      <section class="account-section" aria-labelledby="ordersHeading">
+        <div class="account-section-heading">
+          <div><p class="section-kicker">Orders</p><h2 id="ordersHeading">我的订单</h2></div>
+          <button type="button" data-account-wechat>联系站长</button>
+        </div>
+        <div class="account-order-list" data-account-order-list></div>
+      </section>
+    </div>
+  </section>
+
+  <dialog class="account-wechat-dialog" data-account-wechat-dialog>
+    <form method="dialog">
+      <button value="cancel" aria-label="关闭">×</button>
+      <p class="section-kicker">WeChat</p>
+      <h2>添加站长微信</h2>
+      <p>请添加微信好友，并发送订单号。确认收款后会开通文章。</p>
+      <img src="/images/contact-wechat.jpg" alt="站长微信二维码" />
+    </form>
+  </dialog>
+
+  <script>
+    import "../scripts/account.ts";
+  </script>
+</PortalShell>

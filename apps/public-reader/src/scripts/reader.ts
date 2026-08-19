@@ -127,6 +127,14 @@ const tocBody = mustGet<HTMLElement>("tocBody");
 const tocToggle = mustGet<HTMLButtonElement>("tocToggle");
 const readerScroll = mustGet<HTMLElement>("readerScroll");
 const shareBtn = mustGet<HTMLButtonElement>("shareBtn");
+const mobilePostsBtn = mustGet<HTMLButtonElement>("mobilePostsBtn");
+const mobileTocBtn = mustGet<HTMLButtonElement>("mobileTocBtn");
+const mobileCommentsBtn = mustGet<HTMLButtonElement>("mobileCommentsBtn");
+const mobileShareBtn = mustGet<HTMLButtonElement>("mobileShareBtn");
+const mobileReaderBackdrop = mustGet<HTMLButtonElement>("mobileReaderBackdrop");
+const mobilePostsClose = mustGet<HTMLButtonElement>("mobilePostsClose");
+const articleListPanel = document.querySelector<HTMLElement>(".article-list-panel");
+const tocPanel = mustGet<HTMLElement>("tocPanel");
 const themeBtn = mustGet<HTMLButtonElement>("themeBtn");
 const toast = mustGet<HTMLElement>("toast");
 const commentForm = mustGet<HTMLFormElement>("commentForm");
@@ -231,6 +239,10 @@ function bindEvents() {
   });
 
   tocToggle.addEventListener("click", () => {
+    if (isMobileReader()) {
+      closeMobileReaderPanels();
+      return;
+    }
     const collapsed = app.classList.toggle("toc-collapsed");
     localStorage.setItem("fp_toc_collapsed_v1", collapsed ? "1" : "0");
     tocToggle.innerHTML = collapsed
@@ -239,10 +251,15 @@ function bindEvents() {
     createIcons({ icons });
   });
 
-  shareBtn.addEventListener("click", async () => {
-    const url = publicArticleUrl(activeSlug);
-    await navigator.clipboard.writeText(url).catch(() => undefined);
-    showToast("文章链接已复制");
+  shareBtn.addEventListener("click", copyArticleLink);
+  mobileShareBtn.addEventListener("click", copyArticleLink);
+  mobilePostsBtn.addEventListener("click", () => toggleMobileReaderPanel("posts"));
+  mobileTocBtn.addEventListener("click", () => toggleMobileReaderPanel("toc"));
+  mobileReaderBackdrop.addEventListener("click", closeMobileReaderPanels);
+  mobilePostsClose.addEventListener("click", closeMobileReaderPanels);
+  mobileCommentsBtn.addEventListener("click", () => {
+    closeMobileReaderPanels();
+    commentSection?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" });
   });
 
   themeBtn.addEventListener("click", () => {
@@ -275,6 +292,51 @@ function bindEvents() {
   window.addEventListener("focus", () => {
     void refreshPostsFromApi();
   });
+  window.addEventListener("resize", () => {
+    if (!isMobileReader()) closeMobileReaderPanels();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && app.classList.contains("mobile-panel-open")) {
+      closeMobileReaderPanels();
+    }
+  });
+}
+
+async function copyArticleLink(): Promise<void> {
+  const url = publicArticleUrl(activeSlug);
+  await navigator.clipboard.writeText(url).catch(() => undefined);
+  showToast("文章链接已复制");
+}
+
+function toggleMobileReaderPanel(panel: "posts" | "toc"): void {
+  const target = panel === "posts" ? articleListPanel : tocPanel;
+  const wasOpen = target?.classList.contains("mobile-open") === true;
+  closeMobileReaderPanels();
+  if (wasOpen || !target) return;
+  target.classList.add("mobile-open");
+  app.classList.add("mobile-panel-open");
+  mobileReaderBackdrop.hidden = false;
+  mobilePostsBtn.setAttribute("aria-expanded", String(panel === "posts"));
+  mobileTocBtn.setAttribute("aria-expanded", String(panel === "toc"));
+  const focusTarget = panel === "posts" ? mobilePostsClose : tocPanel.querySelector<HTMLElement>("a,button");
+  window.setTimeout(() => focusTarget?.focus(), 0);
+}
+
+function closeMobileReaderPanels(): void {
+  articleListPanel?.classList.remove("mobile-open");
+  tocPanel.classList.remove("mobile-open");
+  app.classList.remove("mobile-panel-open");
+  mobileReaderBackdrop.hidden = true;
+  mobilePostsBtn.setAttribute("aria-expanded", "false");
+  mobileTocBtn.setAttribute("aria-expanded", "false");
+}
+
+function isMobileReader(): boolean {
+  return window.matchMedia("(max-width: 767px)").matches;
+}
+
+function prefersReducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
 function renderList() {
@@ -302,6 +364,7 @@ function renderList() {
     if (!slug) return;
 
     button.addEventListener("click", () => {
+      closeMobileReaderPanels();
       void openArticle(slug, { push: true, countView: true });
     });
     button.addEventListener("mouseenter", () => {
@@ -385,6 +448,7 @@ async function openArticle(
   commentForm.hidden = lockedPaidArticle;
   commentList.hidden = lockedPaidArticle;
   commentSection!.hidden = lockedPaidArticle;
+  mobileCommentsBtn.disabled = lockedPaidArticle;
   if (!lockedPaidArticle) {
     renderComments();
     void refreshComments(canonicalSlug);
@@ -621,6 +685,7 @@ function renderToc(toc: TocItem[]) {
         behavior: "auto",
         block: "start"
       });
+      closeMobileReaderPanels();
     });
   });
 

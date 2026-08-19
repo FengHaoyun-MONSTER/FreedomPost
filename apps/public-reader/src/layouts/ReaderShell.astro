@@ -45,7 +45,7 @@ const canonicalUrl = new URL(`/p/${encodeURIComponent(article.slug)}`, Astro.sit
 <html lang="zh-CN" data-theme="dark" class={readerBootPendingClass}>
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>{article.title}</title>
     <meta name="description" content={article.excerpt} />
     <link rel="canonical" href={canonicalUrl} />
@@ -65,9 +65,14 @@ const canonicalUrl = new URL(`/p/${encodeURIComponent(article.slug)}`, Astro.sit
               <small>自由发布</small>
             </span>
           </a>
-          <button id="themeBtn" class="icon-button" type="button" aria-label="切换主题" title="切换主题">
-            <i data-lucide="sun"></i>
-          </button>
+          <div class="brand-row-actions">
+            <button id="themeBtn" class="icon-button" type="button" aria-label="切换主题" title="切换主题">
+              <i data-lucide="sun"></i>
+            </button>
+            <button id="mobilePostsClose" class="icon-button mobile-panel-close" type="button" aria-label="关闭文章列表">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
         </div>
         <div class="search-row">
           <i data-lucide="search"></i>
@@ -101,7 +106,12 @@ const canonicalUrl = new URL(`/p/${encodeURIComponent(article.slug)}`, Astro.sit
         </div>
       </nav>
 
+      <button id="mobileReaderBackdrop" class="reader-mobile-backdrop" type="button" aria-label="关闭面板" hidden></button>
+
       <header class="topbar">
+        <a class="reader-mobile-back" href="/articles/" target="_top" aria-label="返回文章入口">
+          <i data-lucide="chevron-left"></i>
+        </a>
         <div class="topbar-main">
           <strong id="topArticleTitle">{article.title}</strong>
           <span id="topArticleDate">{formattedDate}</span>
@@ -161,6 +171,21 @@ const canonicalUrl = new URL(`/p/${encodeURIComponent(article.slug)}`, Astro.sit
         </div>
         <div class="footer-slot"></div>
       </footer>
+
+      <nav class="reader-mobile-actions" aria-label="文章操作">
+        <button id="mobilePostsBtn" class="reader-mobile-action" type="button" aria-controls="postList" aria-expanded="false">
+          <i data-lucide="library"></i><span>文章</span>
+        </button>
+        <button id="mobileTocBtn" class="reader-mobile-action" type="button" aria-controls="tocPanel" aria-expanded="false">
+          <i data-lucide="list-tree"></i><span>目录</span>
+        </button>
+        <button id="mobileCommentsBtn" class="reader-mobile-action" type="button">
+          <i data-lucide="message-circle"></i><span>评论</span>
+        </button>
+        <button id="mobileShareBtn" class="reader-mobile-action" type="button">
+          <i data-lucide="share-2"></i><span>分享</span>
+        </button>
+      </nav>
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script id="initialPayload" type="application/json" is:inline set:html={initialPayload}></script>
