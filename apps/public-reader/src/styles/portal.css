@@ -174,10 +174,17 @@ svg {
 }
 
 .earn-nav-link {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   margin-left: 6px;
+  padding-block: 6px;
   border: 1px solid color-mix(in srgb, var(--portal-accent) 55%, var(--portal-line));
   border-radius: 8px;
   color: var(--portal-accent);
+  line-height: 1;
 }
 
 .earn-nav-link::after {
@@ -188,6 +195,15 @@ svg {
 .earn-nav-link.active {
   background: var(--portal-accent-soft);
   color: var(--portal-accent);
+}
+
+.earn-nav-tagline {
+  color: color-mix(in srgb, currentColor 72%, var(--portal-muted));
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .header-actions {
@@ -2105,6 +2121,11 @@ svg {
     border-radius: 6px;
     background: var(--portal-accent-soft);
     color: var(--portal-accent);
+  }
+
+  .earn-nav-link {
+    align-items: flex-start;
+    margin-left: 0;
   }
 
   .header-actions {

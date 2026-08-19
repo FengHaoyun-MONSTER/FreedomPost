@@ -1,7 +1,13 @@
 export const portalNavItems = [
   { id: "home", href: "/", label: "首页" },
   { id: "market", href: "/market/", label: "商城" },
-  { id: "earn", href: "/earn/", label: "分享赚钱", className: "earn-nav-link" },
+  {
+    id: "earn",
+    href: "/earn/",
+    label: "分享赚钱",
+    tagline: "一次分享终身收益",
+    className: "earn-nav-link"
+  },
   { id: "articles", href: "/articles/", label: "文章" },
   { id: "tools", href: "/tools/", label: "常用工具" },
   { id: "benefit", href: "/benefit/", label: "站长福利" },
