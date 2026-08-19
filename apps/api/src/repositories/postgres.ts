@@ -81,7 +81,7 @@ export class PostgresContentRepository implements ContentRepository {
   }
 
   async listPostSummaries() {
-    return (await this.listPosts()).filter((post) => post.visibility === "public").map(toPostListItem);
+    return (await this.listPosts()).filter((post) => post.visibility !== "private").map(toPostListItem);
   }
 
   async getPostBySlug(slug: string): Promise<StoredPost | null> {
@@ -103,7 +103,7 @@ export class PostgresContentRepository implements ContentRepository {
   }
 
   async getSearchDocuments() {
-    return (await this.listPosts()).filter((post) => post.visibility === "public").map(toSearchDocument);
+    return (await this.listPosts()).filter((post) => post.visibility !== "private").map(toSearchDocument);
   }
 
   async createPost(input: CreatePostInput): Promise<StoredPost> {
@@ -115,6 +115,8 @@ export class PostgresContentRepository implements ContentRepository {
       title: input.title.trim() || "未命名文章",
       markdown: input.markdown,
       visibility: input.visibility ?? "public",
+      priceCents: input.priceCents ?? 0,
+      currency: input.currency ?? "CNY",
       createdAt,
       updatedAt: createdAt,
       viewCount: 0,
@@ -134,6 +136,8 @@ export class PostgresContentRepository implements ContentRepository {
         searchText: rendered.searchText,
         excerpt: rendered.excerpt,
         visibility: rendered.visibility,
+        priceCents: rendered.priceCents,
+        currency: rendered.currency,
         seoTitle: rendered.title,
         seoDescription: rendered.excerpt,
         createdAt: new Date(rendered.createdAt),
@@ -157,6 +161,8 @@ export class PostgresContentRepository implements ContentRepository {
       title: input.title.trim() || post.title,
       markdown: input.markdown,
       visibility: input.visibility ?? post.visibility,
+      priceCents: input.priceCents ?? post.priceCents,
+      currency: input.currency ?? post.currency,
       updatedAt: new Date().toISOString()
     });
 
@@ -170,6 +176,8 @@ export class PostgresContentRepository implements ContentRepository {
         searchText: rendered.searchText,
         excerpt: rendered.excerpt,
         visibility: rendered.visibility,
+        priceCents: rendered.priceCents,
+        currency: rendered.currency,
         seoTitle: rendered.title,
         seoDescription: rendered.excerpt,
         updatedAt: new Date(rendered.updatedAt)
@@ -760,7 +768,9 @@ function mapPostRow(row: PostRow): StoredPost {
     slug: row.slug,
     title: row.title,
     markdown: row.contentMarkdown ?? "",
-    visibility: row.visibility === "private" ? "private" : "public",
+    visibility: row.visibility === "private" ? "private" : row.visibility === "paid" ? "paid" : "public",
+    priceCents: row.priceCents,
+    currency: row.currency,
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt),
     viewCount: row.viewCount,

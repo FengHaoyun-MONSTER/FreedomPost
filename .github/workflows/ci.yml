@@ -27,8 +27,22 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: services/paid-access/go.mod
+          cache-dependency-path: services/paid-access/go.sum
+
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
       - name: Check
         run: npm run check
+
+      - name: Check Go paid access service
+        working-directory: services/paid-access
+        run: |
+          gofmt_output="$(gofmt -l .)"
+          test -z "$gofmt_output" || { echo "$gofmt_output"; exit 1; }
+          go vet ./...
+          go test -race -coverprofile=coverage.out ./...

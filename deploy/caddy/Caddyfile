@@ -14,9 +14,15 @@
 	}
 	@benefitApi path /api/benefits/webmaster*
 	header @benefitApi Cache-Control "no-store"
+	@readerApi path /api/reader/*
+	header @readerApi Cache-Control "private, no-store"
 
 	@legacyTopics path /topics /topics/
 	redir @legacyTopics /benefit/?{query} permanent
+
+	handle /api/reader/* {
+		reverse_proxy paid-access:8080
+	}
 
 	handle /api/* {
 		reverse_proxy app:3000

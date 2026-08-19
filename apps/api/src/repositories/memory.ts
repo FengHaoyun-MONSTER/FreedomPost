@@ -46,6 +46,8 @@ export function createSeedPosts(): StoredPost[] {
       createdAt: now,
       updatedAt: now,
       visibility: "public",
+      priceCents: 0,
+      currency: "CNY",
       viewCount: 128,
       commentCount: 0,
       attachmentCount: 0
@@ -88,7 +90,7 @@ export class MemoryContentRepository implements ContentRepository {
   }
 
   async listPostSummaries() {
-    const posts = (await this.listPosts()).filter((post) => post.visibility === "public");
+    const posts = (await this.listPosts()).filter((post) => post.visibility !== "private");
     return posts.map((post) =>
       toPostListItem({
         ...post,
@@ -106,7 +108,7 @@ export class MemoryContentRepository implements ContentRepository {
   }
 
   async getSearchDocuments() {
-    return (await this.listPosts()).filter((post) => post.visibility === "public").map(toSearchDocument);
+    return (await this.listPosts()).filter((post) => post.visibility !== "private").map(toSearchDocument);
   }
 
   async createPost(input: CreatePostInput): Promise<StoredPost> {
@@ -117,6 +119,8 @@ export class MemoryContentRepository implements ContentRepository {
       title: input.title.trim() || "未命名文章",
       markdown: input.markdown,
       visibility: input.visibility ?? "public",
+      priceCents: input.priceCents ?? 0,
+      currency: input.currency ?? "CNY",
       createdAt,
       updatedAt: createdAt,
       viewCount: 0,
@@ -137,6 +141,8 @@ export class MemoryContentRepository implements ContentRepository {
       title: input.title.trim() || post.title,
       markdown: input.markdown,
       visibility: input.visibility ?? post.visibility,
+      priceCents: input.priceCents ?? post.priceCents,
+      currency: input.currency ?? post.currency,
       updatedAt: new Date().toISOString()
     });
 

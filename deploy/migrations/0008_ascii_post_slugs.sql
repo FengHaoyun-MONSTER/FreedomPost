@@ -15,6 +15,8 @@ ON CONFLICT (slug) DO UPDATE SET post_id = EXCLUDED.post_id;
 UPDATE posts
 SET slug = 'tmp-' || substring(replace(id::text, '-', '') FROM 1 FOR 28);
 
+BEGIN;
+
 CREATE TEMP TABLE migration_0008_post_slugs (
   id UUID PRIMARY KEY,
   slug VARCHAR(10) NOT NULL UNIQUE
@@ -62,3 +64,5 @@ BEGIN
   END IF;
 END
 $$;
+
+COMMIT;

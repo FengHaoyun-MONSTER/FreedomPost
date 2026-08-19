@@ -8,6 +8,9 @@ export interface PostListItem {
   viewCount: number;
   commentCount: number;
   excerpt?: string;
+  visibility?: "public" | "paid";
+  priceCents?: number;
+  currency?: string;
 }
 
 export interface ArticleMeta extends PostListItem {

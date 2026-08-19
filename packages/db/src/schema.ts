@@ -29,6 +29,8 @@ export const posts = pgTable(
     searchText: text("search_text").notNull(),
     excerpt: text("excerpt"),
     visibility: varchar("visibility", { length: 16 }).notNull().default("public"),
+    priceCents: integer("price_cents").notNull().default(0),
+    currency: varchar("currency", { length: 8 }).notNull().default("CNY"),
     seoTitle: text("seo_title"),
     seoDescription: text("seo_description"),
     viewCount: bigint("view_count", { mode: "number" }).notNull().default(0),

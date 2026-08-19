@@ -19,6 +19,73 @@
   --toc-collapsed-width: 42px;
 }
 
+.paid-article-gate {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 680px;
+  margin: 64px auto;
+  padding: 36px;
+  border: 1px solid color-mix(in srgb, var(--accent, #c86b36) 40%, transparent);
+  border-radius: 20px;
+  background: #fffaf5;
+  color: #2b211a;
+  box-shadow: 0 18px 60px rgb(58 32 16 / 10%);
+  text-align: center;
+}
+
+.paid-article-gate h2 { margin: 8px 0 16px; }
+.paid-article-gate small { display: block; margin-top: 16px; color: var(--muted, #6b625d); white-space: normal; }
+.paid-article-gate .section-kicker { color: #a64b16; }
+.paid-article-buy { padding: 11px 18px; border: 1px solid #226f54; border-radius: 9px; background: #287e5f !important; color: #fff !important; font: inherit; cursor: pointer; }
+.paid-article-preview { line-height: 1.8; text-align: left; }
+.paid-article-price { display: block; margin: 24px 0 16px; font-size: 2rem; }
+.paid-order-code { display: inline-block; margin: 20px; padding: 12px 18px; border-radius: 10px; background: #211d1a; color: #fff; font: 700 1.35rem/1.2 ui-monospace, monospace; letter-spacing: .08em; }
+.paid-wechat-qr { display: block; width: min(260px, 80%); margin: 24px auto 0; border-radius: 14px; }
+.paid-inline-error, .reader-auth-error { color: #b42318; }
+.paid-list-badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: #fff0df; color: #a64b16; font-size: 11px; vertical-align: 1px; }
+
+.reader-auth-dialog {
+  width: min(460px, calc(100vw - 32px));
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  box-shadow: 0 28px 100px rgb(0 0 0 / 28%);
+}
+.reader-auth-dialog::backdrop { background: rgb(20 18 16 / 62%); backdrop-filter: blur(4px); }
+.reader-auth-shell { position: relative; display: grid; gap: 16px; padding: 30px; }
+.reader-auth-shell label { display: grid; gap: 7px; }
+.reader-auth-shell input { min-height: 44px; padding: 0 12px; border: 1px solid #d5cec7; border-radius: 9px; font: inherit; }
+.reader-auth-close { position: absolute; top: 14px; right: 14px; border: 0; background: transparent; font-size: 1.6rem; cursor: pointer; }
+.reader-auth-tabs { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; border-radius: 10px; background: #f2eeea; }
+.reader-auth-tabs button { padding: 9px; border: 0; border-radius: 7px; background: transparent; cursor: pointer; }
+.reader-auth-tabs button.active { background: #fff; box-shadow: 0 2px 9px rgb(0 0 0 / 8%); }
+.reader-turnstile { min-height: 65px; }
+
+.paid-content-protected {
+  position: relative;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.paid-content-protected::after {
+  content: "FreedomPost · 仅限已授权账号阅读";
+  position: fixed;
+  right: 4vw;
+  bottom: 4vh;
+  z-index: 20;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 68%);
+  color: rgb(70 60 52 / 42%);
+  font-size: 12px;
+  pointer-events: none;
+  transform: rotate(-8deg);
+}
+
+@media print {
+  .paid-content-protected > * { display: none !important; }
+  .paid-content-protected::before { content: "该付费文章不支持打印。"; display: block; padding: 40px; }
+}
+
 [data-theme="dark"] {
   --bg: #151714;
   --panel: #1d211e;
@@ -398,6 +465,8 @@ mark {
 }
 
 .reader {
+  box-sizing: border-box;
+  width: 100%;
   max-width: 860px;
   margin: 0 auto;
   padding: 42px 36px 72px;
@@ -1060,16 +1129,31 @@ mark {
 }
 
 @media (max-width: 900px) {
-  body::before {
-    content: "第一版面向桌面宽屏。";
-    position: fixed;
-    inset: 0;
-    z-index: 99;
-    display: grid;
-    place-items: center;
-    padding: 24px;
-    background: var(--panel);
-    color: var(--text);
-    text-align: center;
+  .app-shell,
+  .app-shell.toc-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: 52px minmax(0, 1fr) 44px;
   }
+
+  .article-list-panel,
+  .list-resizer,
+  .toc-panel {
+    display: none;
+  }
+
+  .topbar,
+  .reader-scroll,
+  .reader-footer {
+    grid-column: 1;
+  }
+
+  .topbar { grid-row: 1; padding: 0 12px; }
+  .reader-scroll { grid-row: 2; }
+  .reader-footer { grid-row: 3; padding: 0 14px; overflow: hidden; }
+  .reader-footer .footer-slot { display: none; }
+  .reader { padding: 28px 18px 54px; }
+  .article-title-block h1 { font-size: 27px; }
+  .topbar-main span,
+  .topbar-actions > span { display: none; }
+  .paid-article-gate { width: calc(100% - 36px); max-width: 100%; margin: 30px auto; padding: 26px 18px; }
 }

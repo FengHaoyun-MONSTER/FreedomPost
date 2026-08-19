@@ -46,6 +46,22 @@ COPY --from=build /app/deploy/integration-staging-smoke.mjs /app/deploy/integrat
 EXPOSE 3000
 CMD ["npm", "run", "start", "-w", "@freedompost/api"]
 
+FROM golang:1.25.13-alpine AS paid-access-build
+WORKDIR /src/services/paid-access
+COPY services/paid-access/go.mod services/paid-access/go.sum ./
+RUN go mod download
+COPY services/paid-access/ ./
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/paid-access ./cmd/server
+
+FROM alpine:3.22 AS paid-access-runtime
+RUN apk add --no-cache ca-certificates \
+  && addgroup -S -g 10001 paidaccess \
+  && adduser -S -D -H -u 10001 -G paidaccess paidaccess
+COPY --from=paid-access-build /out/paid-access /usr/local/bin/paid-access
+USER paidaccess:paidaccess
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/paid-access"]
+
 FROM caddy:2-alpine AS nginx
 COPY deploy/caddy/Caddyfile /etc/caddy/Caddyfile
 COPY --from=build /app/apps/public-reader/dist /var/www/freedompost/public

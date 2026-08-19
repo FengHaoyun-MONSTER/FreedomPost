@@ -20,6 +20,9 @@ function validEnvironment() {
     VISITOR_HASH_SALT: "v".repeat(32),
     ADMIN_PASSWORD: "a".repeat(16),
     POSTGRES_PASSWORD: "p".repeat(32),
+    PAID_ARTICLES_ENABLED: "true",
+    PAID_ACCESS_INTERNAL_URL: "http://paid-access:8080",
+    PAID_ACCESS_INTERNAL_SECRET: "q".repeat(32),
     PREVIEW_DOMAIN: "www.example.com",
     STORAGE_DRIVER: "local",
     TRUST_PROXY: "true",
@@ -50,6 +53,15 @@ test("fails closed when a benefit secret is missing", () => {
   delete environment.OPUS8_INTEGRATION_SECRET;
   const errors = validateProductionEnvironment(environment);
   assert.ok(errors.some((error) => error.name === "OPUS8_INTEGRATION_SECRET"));
+});
+
+test("fails closed when paid access is disabled or its internal secret is missing", () => {
+  const environment = validEnvironment();
+  environment.PAID_ARTICLES_ENABLED = "false";
+  delete environment.PAID_ACCESS_INTERNAL_SECRET;
+  const names = validateProductionEnvironment(environment).map((error) => error.name);
+  assert.ok(names.includes("PAID_ARTICLES_ENABLED"));
+  assert.ok(names.includes("PAID_ACCESS_INTERNAL_SECRET"));
 });
 
 test("rejects a Turnstile hostname that differs from the public host", () => {
@@ -86,7 +98,8 @@ test("deployment workflow and Caddy keep the benefit path protected", () => {
     "OPUS8_INTEGRATION_KEY_ID",
     "OPUS8_INTEGRATION_SECRET",
     "BENEFIT_CLAIM_HMAC_SECRET",
-    "BENEFIT_LINK_ENCRYPTION_KEY"
+    "BENEFIT_LINK_ENCRYPTION_KEY",
+    "PAID_ACCESS_INTERNAL_SECRET"
   ]) {
     assert.match(workflow, new RegExp(`secrets\\.${name}`));
   }
@@ -97,6 +110,10 @@ test("deployment workflow and Caddy keep the benefit path protected", () => {
   }
   assert.match(caddy, /@benefitApi path \/api\/benefits\/webmaster\*/);
   assert.match(caddy, /header @benefitApi Cache-Control "no-store"/);
+  assert.match(caddy, /@readerApi path \/api\/reader\/\*/);
+  assert.match(caddy, /header @readerApi Cache-Control "private, no-store"/);
+  assert.match(caddy, /handle \/api\/reader\/\*[\s\S]*reverse_proxy paid-access:8080/);
+  assert.doesNotMatch(caddy, /handle \/internal\/\*/);
   assert.match(caddy, /script-src[^\n]*https:\/\/challenges\.cloudflare\.com/);
   assert.match(caddy, /frame-src[^\n]*https:\/\/challenges\.cloudflare\.com/);
   assert.match(caddy, /connect-src[^\n]*https:\/\/challenges\.cloudflare\.com/);

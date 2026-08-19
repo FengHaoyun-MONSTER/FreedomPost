@@ -14,6 +14,7 @@ services:
       - "443:443"
     depends_on:
       - app
+      - paid-access
     volumes:
       - caddydata:/data
       - caddyconfig:/config
@@ -31,8 +32,26 @@ services:
     depends_on:
       - postgres
       - redis
+      - paid-access
     volumes:
       - ../runtime:/app/runtime
+
+  paid-access:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: paid-access-runtime
+    env_file:
+      - ../.env
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid
+    security_opt:
+      - no-new-privileges:true
 
   postgres:
     image: postgres:16-alpine

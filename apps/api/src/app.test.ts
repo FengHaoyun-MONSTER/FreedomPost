@@ -1,9 +1,10 @@
 import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { extractManagedStorageKeys } from "./asset-cleanup.js";
 import { buildApp } from "./app.js";
+import type { PaidAccessClient } from "./paid-access-client.js";
 import { MemoryContentRepository } from "./repositories/index.js";
 import { renderStoredPost } from "./repositories/post-utils.js";
 
@@ -56,6 +57,48 @@ describe("api app", () => {
     expect(search.json().documents.map((item: { slug: string }) => item.slug)).toEqual(["public"]);
     expect(comments.statusCode).toBe(404);
     expect(view.statusCode).toBe(404);
+  });
+
+  it("lists paid article previews without exposing the full body and gates comments through Go authorization", async () => {
+    const markdown = `${"公开预览 ".repeat(30)} TOP_SECRET_PAID_BODY`;
+    const repository = new MemoryContentRepository([
+      testPost({ id: "post-paid", slug: "paid", title: "付费文章", markdown, visibility: "paid", priceCents: 990 })
+    ]);
+    const paidAccess = paidAccessStub(async () => true);
+    const app = buildApp({ repository, paidAccess });
+
+    const list = await app.inject({ method: "GET", url: "/api/posts" });
+    const search = await app.inject({ method: "GET", url: "/api/search-index" });
+    const legacyDetail = await app.inject({ method: "GET", url: "/api/posts/paid" });
+    const comments = await app.inject({ method: "GET", url: "/api/posts/paid/comments", headers: { cookie: "fp_reader_session=session-token" } });
+    await app.close();
+
+    expect(list.json().items[0]).toMatchObject({ slug: "paid", visibility: "paid", priceCents: 990, currency: "CNY" });
+    expect(search.json().documents[0].body).not.toContain("TOP_SECRET_PAID_BODY");
+    expect(legacyDetail.statusCode).toBe(404);
+    expect(comments.statusCode).toBe(200);
+    expect(paidAccess.canRead).toHaveBeenCalledWith("session-token", "paid");
+  });
+
+  it("fails closed when the paid access service cannot authorize a reader", async () => {
+    const repository = new MemoryContentRepository([
+      testPost({ id: "post-paid", slug: "paid", title: "付费文章", markdown: "secret", visibility: "paid", priceCents: 990 })
+    ]);
+    const app = buildApp({ repository, paidAccess: paidAccessStub(async () => { throw new Error("service unavailable"); }) });
+    const response = await app.inject({ method: "GET", url: "/api/posts/paid/comments", headers: { cookie: "fp_reader_session=session-token" } });
+    await app.close();
+    expect(response.statusCode).toBe(404);
+  });
+
+  it("requires a positive integer price before publishing a paid article", async () => {
+    const app = buildApp({ repository: new MemoryContentRepository() });
+    const cookie = await adminCookie(app);
+    const rejected = await app.inject({ method: "POST", url: "/api/admin/posts", headers: { cookie }, payload: { title: "Paid", markdown: "secret", visibility: "paid", priceCents: 0 } });
+    const created = await app.inject({ method: "POST", url: "/api/admin/posts", headers: { cookie }, payload: { title: "Paid", markdown: "secret", visibility: "paid", priceCents: 990, currency: "CNY" } });
+    await app.close();
+    expect(rejected.statusCode).toBe(400);
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({ visibility: "paid", priceCents: 990, currency: "CNY" });
   });
 
   it("allows admins to create and switch private posts", async () => {
@@ -560,14 +603,26 @@ async function fileExists(target: string): Promise<boolean> {
     .catch(() => false);
 }
 
-function testPost(input: { id: string; slug: string; title: string; markdown: string; visibility?: "public" | "private" }) {
+function testPost(input: { id: string; slug: string; title: string; markdown: string; visibility?: "public" | "private" | "paid"; priceCents?: number }) {
   return renderStoredPost({
     ...input,
     createdAt: "2026-07-05T00:00:00.000Z",
     updatedAt: "2026-07-05T00:00:00.000Z",
     visibility: input.visibility ?? "public",
+    priceCents: input.priceCents ?? 0,
+    currency: "CNY",
     viewCount: 0,
     commentCount: 0,
     attachmentCount: 0
   });
+}
+
+function paidAccessStub(canRead: PaidAccessClient["canRead"]): PaidAccessClient {
+  return {
+    canRead: vi.fn(canRead),
+    listOrders: async () => ({ items: [] }),
+    updateOrder: async () => ({ order: null }),
+    listAccounts: async () => ({ items: [] }),
+    resetPassword: async () => ({ temporaryPassword: "temporary" })
+  };
 }
