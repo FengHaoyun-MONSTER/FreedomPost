@@ -920,39 +920,8 @@ function App() {
                 <span>/p/{activePost.slug}</span>
               </div>
             </header>
-            <div className="editor-workspace">
-              <label className="title-field">
-                <span>标题</span>
-                <input value={activePost.title} onChange={(event) => patchActivePost({ title: event.target.value })} />
-              </label>
-              <label className="post-visibility-field">
-                <span>文章可见性</span>
-                <select value={activePost.visibility} onChange={(event) => patchActivePost({ visibility: event.target.value as AdminPost["visibility"] })}>
-                  <option value="public">公开，所有人可见</option>
-                  <option value="private">私密，仅自己可见</option>
-                  <option value="paid">付费，购买后可见</option>
-                </select>
-              </label>
-              {activePost.visibility === "paid" && (
-                <label className="post-visibility-field">
-                  <span>文章价格（人民币元）</span>
-                  <input type="number" min="0.01" max="1000000" step="0.01" value={(activePost.priceCents / 100).toFixed(2)} onChange={(event) => patchActivePost({ priceCents: Math.round(Number(event.target.value) * 100), currency: "CNY" })} />
-                </label>
-              )}
-              <div
-                ref={editorRef}
-                className="rich-editor"
-                contentEditable
-                suppressContentEditableWarning
-                role="textbox"
-                aria-label="文章正文"
-                onInput={syncEditorMarkdown}
-                onPaste={handleEditorPaste}
-                onClick={handleEditorClick}
-                onKeyDown={handleEditorKeyDown}
-              />
-            </div>
-            <div className="toolbar" aria-label="编辑工具栏">
+            <div className="toolbar article-toolbar" aria-label="编辑工具栏">
+              <div className="toolbar-tools">
               <label className="toolbar-field">
                 <Type size={15} aria-hidden="true" />
                 <select
@@ -1092,19 +1061,53 @@ function App() {
                   event.target.value = "";
                 }}
               />
-              <span className="toolbar-fill" />
-              <button className="danger-button" type="button" onClick={deletePost}>
-                <Trash2 size={15} />
-                删除
-              </button>
-              <button className="primary" type="button" onClick={savePost} disabled={isSavingPost}>
-                <Save size={15} />
-                {isSavingPost
-                  ? "保存中…"
-                  : pendingMediaCount > 0
-                    ? `等待媒体（${pendingMediaCount}）`
-                    : "保存"}
-              </button>
+              </div>
+              <div className="toolbar-actions">
+                <button className="danger-button" type="button" onClick={deletePost}>
+                  <Trash2 size={15} />
+                  删除
+                </button>
+                <button className="primary" type="button" onClick={savePost} disabled={isSavingPost}>
+                  <Save size={15} />
+                  {isSavingPost
+                    ? "保存中…"
+                    : pendingMediaCount > 0
+                      ? `等待媒体（${pendingMediaCount}）`
+                      : "保存"}
+                </button>
+              </div>
+            </div>
+            <div className="editor-workspace">
+              <label className="title-field">
+                <span>标题</span>
+                <input value={activePost.title} onChange={(event) => patchActivePost({ title: event.target.value })} />
+              </label>
+              <label className="post-visibility-field">
+                <span>文章可见性</span>
+                <select value={activePost.visibility} onChange={(event) => patchActivePost({ visibility: event.target.value as AdminPost["visibility"] })}>
+                  <option value="public">公开，所有人可见</option>
+                  <option value="private">私密，仅自己可见</option>
+                  <option value="paid">付费，购买后可见</option>
+                </select>
+              </label>
+              {activePost.visibility === "paid" && (
+                <label className="post-visibility-field">
+                  <span>文章价格（人民币元）</span>
+                  <input type="number" min="0.01" max="1000000" step="0.01" value={(activePost.priceCents / 100).toFixed(2)} onChange={(event) => patchActivePost({ priceCents: Math.round(Number(event.target.value) * 100), currency: "CNY" })} />
+                </label>
+              )}
+              <div
+                ref={editorRef}
+                className="rich-editor"
+                contentEditable
+                suppressContentEditableWarning
+                role="textbox"
+                aria-label="文章正文"
+                onInput={syncEditorMarkdown}
+                onPaste={handleEditorPaste}
+                onClick={handleEditorClick}
+                onKeyDown={handleEditorKeyDown}
+              />
             </div>
           </>
         ) : (
