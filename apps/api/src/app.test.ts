@@ -18,7 +18,7 @@ describe("api app", () => {
     expect(response.json()).toMatchObject({ ok: true, service: "freedompost-api" });
   });
 
-  it("records one view per visitor key per day", async () => {
+  it("adds 100 for one view per visitor key per day", async () => {
     const app = buildApp({ repository: new MemoryContentRepository() });
 
     const first = await app.inject({
@@ -34,8 +34,8 @@ describe("api app", () => {
     await app.close();
 
     expect(first.statusCode).toBe(200);
-    expect(first.json().counted).toBe(true);
-    expect(second.json().counted).toBe(false);
+    expect(first.json()).toMatchObject({ counted: true, viewCount: 228 });
+    expect(second.json()).toMatchObject({ counted: false, viewCount: 228 });
   });
 
   it("keeps private posts out of every public article endpoint", async () => {
@@ -98,7 +98,7 @@ describe("api app", () => {
     await app.close();
     expect(rejected.statusCode).toBe(400);
     expect(created.statusCode).toBe(201);
-    expect(created.json()).toMatchObject({ visibility: "paid", priceCents: 990, currency: "CNY" });
+    expect(created.json()).toMatchObject({ visibility: "paid", priceCents: 990, currency: "CNY", viewCount: 100 });
   });
 
   it("allows admins to create and switch private posts", async () => {

@@ -10,6 +10,8 @@ import {
   benefitCampaigns as benefitCampaignsTable,
   benefitClaims as benefitClaimsTable,
   comments as commentsTable,
+  POST_INITIAL_VIEW_COUNT,
+  POST_VIEW_INCREMENT,
   postSlugAliases as postSlugAliasesTable,
   postViews as postViewsTable,
   posts as postsTable,
@@ -119,7 +121,7 @@ export class PostgresContentRepository implements ContentRepository {
       currency: input.currency ?? "CNY",
       createdAt,
       updatedAt: createdAt,
-      viewCount: 0,
+      viewCount: POST_INITIAL_VIEW_COUNT,
       commentCount: 0,
       attachmentCount: 0
     });
@@ -138,6 +140,7 @@ export class PostgresContentRepository implements ContentRepository {
         visibility: rendered.visibility,
         priceCents: rendered.priceCents,
         currency: rendered.currency,
+        viewCount: rendered.viewCount,
         seoTitle: rendered.title,
         seoDescription: rendered.excerpt,
         createdAt: new Date(rendered.createdAt),
@@ -213,13 +216,13 @@ export class PostgresContentRepository implements ContentRepository {
     if (inserted.length > 0) {
       const [updated] = await this.db
         .update(postsTable)
-        .set({ viewCount: sql`${postsTable.viewCount} + 1` })
+        .set({ viewCount: sql`${postsTable.viewCount} + ${POST_VIEW_INCREMENT}` })
         .where(eq(postsTable.id, post.id))
         .returning({ viewCount: postsTable.viewCount });
 
       return {
         counted: true,
-        viewCount: updated?.viewCount ?? post.viewCount + 1
+        viewCount: updated?.viewCount ?? post.viewCount + POST_VIEW_INCREMENT
       };
     }
 

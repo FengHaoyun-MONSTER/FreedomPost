@@ -1,3 +1,4 @@
+import { POST_INITIAL_VIEW_COUNT, POST_VIEW_INCREMENT } from "@freedompost/db";
 import type { Comment } from "@freedompost/shared";
 import {
   makePostSlug,
@@ -123,7 +124,7 @@ export class MemoryContentRepository implements ContentRepository {
       currency: input.currency ?? "CNY",
       createdAt,
       updatedAt: createdAt,
-      viewCount: 0,
+      viewCount: POST_INITIAL_VIEW_COUNT,
       commentCount: 0,
       attachmentCount: 0
     });
@@ -167,7 +168,7 @@ export class MemoryContentRepository implements ContentRepository {
     const counted = !this.views.has(key);
     if (counted) {
       this.views.add(key);
-      post.viewCount += 1;
+      post.viewCount += POST_VIEW_INCREMENT;
       this.posts.set(post.id, post);
     }
 
