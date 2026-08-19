@@ -5,6 +5,7 @@ const SIMPLE_SECRET_NAMES = [
   "VISITOR_HASH_SALT",
   "ADMIN_PASSWORD",
   "POSTGRES_PASSWORD",
+  "PAID_ACCESS_INTERNAL_SECRET",
   "TURNSTILE_SECRET_KEY",
   "OPUS8_INTEGRATION_SECRET",
   "BENEFIT_CLAIM_HMAC_SECRET"
@@ -39,12 +40,22 @@ export function validateRuntimeEnvironment(environment = process.env) {
   if (!validRedisUrl(value("REDIS_URL"))) {
     add("REDIS_URL", "must be an absolute redis:// or rediss:// URL");
   }
+  if (value("PAID_ARTICLES_ENABLED") !== "true") {
+    add("PAID_ARTICLES_ENABLED", "must be true for the paid-access production release");
+  }
+  if (value("PAID_ACCESS_INTERNAL_URL") !== "http://paid-access:8080") {
+    add("PAID_ACCESS_INTERNAL_URL", "must target the private paid-access service");
+  }
+  if (value("PAID_ACCESS_INTERNAL_SECRET") === value("BENEFIT_CLAIM_HMAC_SECRET")) {
+    add("PAID_ACCESS_INTERNAL_SECRET", "must be distinct from the benefit HMAC secret");
+  }
 
   const minimumLengths = {
     COOKIE_SECRET: 32,
     VISITOR_HASH_SALT: 32,
     ADMIN_PASSWORD: 8,
     POSTGRES_PASSWORD: 12,
+    PAID_ACCESS_INTERNAL_SECRET: 32,
     TURNSTILE_SECRET_KEY: 20,
     OPUS8_INTEGRATION_SECRET: 32,
     BENEFIT_CLAIM_HMAC_SECRET: 32

@@ -1,0 +1,89 @@
+openapi: 3.1.0
+info:
+  title: FreedomPost Paid Access API
+  version: 1.0.0
+servers:
+  - url: /
+paths:
+  /api/reader/config:
+    get:
+      summary: Read public paid-access configuration
+      responses:
+        "200": { description: Configuration }
+  /api/reader/register:
+    post:
+      summary: Register and establish a persistent reader session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Credentials" }
+      responses:
+        "201": { description: Registered; sets fp_reader_session }
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "409": { description: Login name already exists }
+  /api/reader/login:
+    post:
+      summary: Authenticate a reader
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Credentials" }
+      responses:
+        "200": { description: Authenticated; sets fp_reader_session }
+        "401": { description: Generic login failure }
+  /api/reader/logout:
+    post:
+      summary: Revoke the current reader session
+      responses:
+        "200": { description: Logged out }
+  /api/reader/session:
+    get:
+      summary: Read the current reader account
+      responses:
+        "200": { description: Active account }
+        "401": { description: No active session }
+  /api/reader/posts/{slug}:
+    get:
+      summary: Read a public article or an authorized paid article
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string, maxLength: 32 }
+      responses:
+        "200": { description: Locked responses omit contentHtml }
+        "404": { description: Private or missing article }
+  /api/reader/posts/{slug}/orders:
+    post:
+      summary: Create or reuse a pending article order
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string, maxLength: 32 }
+      responses:
+        "201": { description: Order created }
+        "200": { description: Existing pending order returned }
+        "401": { description: Reader login required }
+        "409": { description: Article already entitled }
+  /api/reader/orders:
+    get:
+      summary: List current reader orders
+      responses:
+        "200": { description: Orders }
+        "401": { description: Reader login required }
+components:
+  schemas:
+    Credentials:
+      type: object
+      additionalProperties: false
+      required: [loginName, password, turnstileToken]
+      properties:
+        loginName: { type: string, minLength: 3, maxLength: 128 }
+        password: { type: string, minLength: 8, maxLength: 128, writeOnly: true }
+        turnstileToken: { type: string, minLength: 20, maxLength: 4096, writeOnly: true }
+  responses:
+    InvalidRequest:
+      description: Invalid input or Turnstile rejection

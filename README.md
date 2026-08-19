@@ -86,6 +86,8 @@ ALIYUN_OSS_PREFIX=freedompost/uploads
 
 ## 下一步开发顺序
 
+付费文章、读者账号、人工微信收款订单和 Go 渐进迁移的边界、配置及回滚方式见 [`docs/paid-article-access.md`](docs/paid-article-access.md)。
+
 1. 将管理员登录会话和评论限流落到 PostgreSQL/Redis。
 2. 接入 Tiptap/ProseMirror 编辑器和图片粘贴上传。
 3. 发布管线写入 `runtime/public` 并原子更新搜索索引。

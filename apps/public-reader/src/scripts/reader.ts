@@ -9,6 +9,11 @@ import {
   finishReaderBootGuard,
   releaseReaderBootGuardIfUnrequested
 } from "../lib/reader-boot.js";
+import {
+  renderPaidArticleGate,
+  setPaidContentProtection,
+  type ReaderAccessState
+} from "./paid-access.js";
 
 type TocItem = {
   id: string;
@@ -24,6 +29,9 @@ type PostListItem = {
   viewCount: number;
   commentCount: number;
   excerpt?: string;
+  visibility?: "public" | "paid";
+  priceCents?: number;
+  currency?: string;
 };
 
 type SearchDocument = {
@@ -44,6 +52,9 @@ type ApiPostDetail = PostListItem & {
   contentHtml: string;
   markdown?: string;
   attachmentCount: number;
+  visibility?: "public" | "paid";
+  priceCents?: number;
+  currency?: string;
 };
 
 type ArticleCacheItem = {
@@ -52,6 +63,12 @@ type ArticleCacheItem = {
   toc: TocItem[];
   meta: ArticleMeta;
   cachedAt: number;
+  access?: ReaderAccessState;
+  paid?: {
+    priceCents: number;
+    currency: string;
+    wechatImageUrl?: string;
+  };
 };
 
 type StoredCommentAttachment = {
@@ -113,6 +130,8 @@ const shareBtn = mustGet<HTMLButtonElement>("shareBtn");
 const themeBtn = mustGet<HTMLButtonElement>("themeBtn");
 const toast = mustGet<HTMLElement>("toast");
 const commentForm = mustGet<HTMLFormElement>("commentForm");
+const commentSection = commentForm.closest<HTMLElement>(".comments");
+if (!commentSection) throw new Error("Missing comments section");
 const commentText = mustGet<HTMLTextAreaElement>("commentText");
 const commentPendingFiles = mustGet<HTMLElement>("commentPendingFiles");
 const commentSubmit = mustGet<HTMLButtonElement>("commentSubmit");
@@ -192,7 +211,7 @@ async function init() {
   prefetchIdleArticles();
 
   commentUser.textContent = getRandomUsername();
-  countViewOnce(activeSlug);
+  if (!articleCache.get(activeSlug)?.access?.locked) countViewOnce(activeSlug);
 }
 
 async function hydrateRequestedArticle(slug: string) {
@@ -268,7 +287,7 @@ function renderList() {
       return `<button class="post-item ${post.slug === activeSlug ? "active" : ""}" type="button" data-slug="${escapeHtml(
         post.slug
       )}">
-        <span class="post-title" title="${escapeHtml(post.title)}">${highlight(post.title, query)}</span>
+        <span class="post-title" title="${escapeHtml(post.title)}">${highlight(post.title, query)}${post.visibility === "paid" ? ' <small class="paid-list-badge">付费</small>' : ""}</span>
         <span class="post-stats">
           <span>${formatDate(post.updatedAt)}</span>
           <span>${post.viewCount} 阅读</span>
@@ -330,8 +349,26 @@ async function openArticle(
 
   const canonicalSlug = cached.slug || cached.meta.slug || slug;
   activeSlug = canonicalSlug;
-  articleCache.set(canonicalSlug, cached);
-  articleBody.innerHTML = cached.html;
+  if (cached.paid && cached.access?.purchased) articleCache.delete(canonicalSlug);
+  else articleCache.set(canonicalSlug, cached);
+  const lockedPaidArticle = cached.access?.locked === true && cached.paid !== undefined;
+  if (lockedPaidArticle && cached.paid) {
+    renderPaidArticleGate(articleBody, {
+      slug: canonicalSlug,
+      title: cached.meta.title,
+      excerpt: cached.meta.excerpt ?? "",
+      priceCents: cached.paid.priceCents,
+      currency: cached.paid.currency,
+      access: cached.access ?? { locked: true, authenticated: false, purchased: false },
+      ...(cached.paid.wechatImageUrl ? { wechatImageUrl: cached.paid.wechatImageUrl } : {})
+    }, () => {
+      articleCache.delete(canonicalSlug);
+      void openArticle(canonicalSlug, { push: false, countView: false });
+    });
+  } else {
+    articleBody.innerHTML = cached.html;
+  }
+  setPaidContentProtection(articleBody, cached.paid !== undefined && cached.access?.purchased === true);
   articleTitle.textContent = cached.meta.title;
   articleDate.textContent = `发布时间：${formatDate(cached.meta.createdAt)}`;
   articleViews.textContent = `${cached.meta.viewCount} 阅读`;
@@ -343,14 +380,19 @@ async function openArticle(
   document.title = cached.meta.title;
 
   renderToc(cached.toc);
-  enhanceCodeBlocks();
+  if (!lockedPaidArticle) enhanceCodeBlocks();
   propagateReaderLinks();
-  renderComments();
-  void refreshComments(canonicalSlug);
+  commentForm.hidden = lockedPaidArticle;
+  commentList.hidden = lockedPaidArticle;
+  commentSection!.hidden = lockedPaidArticle;
+  if (!lockedPaidArticle) {
+    renderComments();
+    void refreshComments(canonicalSlug);
+  }
   renderList();
   readerScroll.scrollTop = 0;
 
-  if (options.countView) {
+  if (options.countView && !lockedPaidArticle) {
     countViewOnce(canonicalSlug);
   }
 
@@ -384,7 +426,7 @@ function renderUnavailableArticle() {
   document.title = title;
 }
 
-async function prefetchArticle(slug: string) {
+async function prefetchArticle(slug: string): Promise<ArticleCacheItem | null> {
   const cached = articleCache.get(slug);
   if (cached) return cached;
 
@@ -395,8 +437,10 @@ async function prefetchArticle(slug: string) {
     if (error instanceof ApiPostNotFoundError) return null;
   }
   if (apiItem) {
-    articleCache.set(slug, apiItem);
-    articleCache.set(apiItem.slug, apiItem);
+    if (!apiItem.paid || !apiItem.access?.purchased) {
+      articleCache.set(slug, apiItem);
+      articleCache.set(apiItem.slug, apiItem);
+    }
     return apiItem;
   }
 
@@ -423,8 +467,43 @@ async function prefetchArticle(slug: string) {
 
 async function fetchArticleFromApi(slug: string): Promise<ArticleCacheItem | null> {
   try {
-    const response = await fetch(`/api/posts/${encodeURIComponent(slug)}`);
-    if (response.status === 404) throw new ApiPostNotFoundError("Article is not public");
+    let response = await fetch(`/api/reader/posts/${encodeURIComponent(slug)}`, { credentials: "include" });
+    let access: ReaderAccessState | undefined;
+    let contact: { wechatImageUrl?: string } | undefined;
+    if (response.ok) {
+      const readerPayload = (await response.json()) as { item: ApiPostDetail; access?: ReaderAccessState; contact?: { wechatImageUrl?: string } };
+      const item = readerPayload.item;
+      access = readerPayload.access;
+      contact = readerPayload.contact;
+      return {
+        slug: item.slug,
+        html: item.contentHtml || "",
+        toc: item.contentHtml ? extractTocFromHtml(item.contentHtml) : [],
+        meta: {
+          slug: item.slug,
+          title: item.title,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          viewCount: item.viewCount,
+          commentCount: item.commentCount,
+          excerpt: item.excerpt,
+          attachmentCount: item.attachmentCount,
+          canonicalPath: articlePermalinkPath(item.slug)
+        },
+        cachedAt: Date.now(),
+        ...(item.visibility === "paid" ? {
+          access: access ?? { locked: true, authenticated: false, purchased: false },
+          paid: {
+            priceCents: item.priceCents ?? 0,
+            currency: item.currency ?? "CNY",
+            ...(contact?.wechatImageUrl ? { wechatImageUrl: contact.wechatImageUrl } : {})
+          }
+        } : {})
+      };
+    }
+    if (response.status !== 404) throw new Error(`Failed to fetch article ${slug}`);
+    response = await fetch(`/api/posts/${encodeURIComponent(slug)}`);
+    if (response.status === 404) throw new ApiPostNotFoundError("Article is not readable");
     if (!response.ok) throw new Error(`Failed to fetch article ${slug}`);
     const payload = (await response.json()) as { item: ApiPostDetail };
     const item = payload.item;

@@ -52,7 +52,9 @@ type AdminPost = {
   viewCount: number;
   commentCount: number;
   attachmentCount: number;
-  visibility: "public" | "private";
+  visibility: "public" | "private" | "paid";
+  priceCents: number;
+  currency: string;
 };
 
 type Toast = {
@@ -129,6 +131,24 @@ type AdminAffiliateOrder = {
   createdAt: string;
 };
 
+type AdminArticleOrder = {
+  id: string;
+  orderCode: string;
+  loginName: string;
+  postTitle: string;
+  priceCents: number;
+  currency: string;
+  status: "pending" | "completed" | "canceled";
+  createdAt: string;
+};
+
+type AdminReaderAccount = {
+  id: string;
+  loginName: string;
+  status: "active" | "disabled";
+  createdAt: string;
+};
+
 const headingOptions = [
   { label: "正文", value: "p" },
   { label: "标题 1", value: "h1" },
@@ -162,8 +182,10 @@ function App() {
   const [tools, setTools] = useState<AdminTool[]>([]);
   const [affiliates, setAffiliates] = useState<AdminAffiliate[]>([]);
   const [affiliateOrders, setAffiliateOrders] = useState<AdminAffiliateOrder[]>([]);
+  const [articleOrders, setArticleOrders] = useState<AdminArticleOrder[]>([]);
+  const [readerAccounts, setReaderAccounts] = useState<AdminReaderAccount[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [workspace, setWorkspace] = useState<"posts" | "products" | "tools" | "distribution">("posts");
+  const [workspace, setWorkspace] = useState<"posts" | "products" | "tools" | "distribution" | "paid">("posts");
   const [toast, setToast] = useState<Toast | null>(null);
   const [pendingMediaCount, setPendingMediaCount] = useState(0);
   const [isSavingPost, setSavingPost] = useState(false);
@@ -266,6 +288,15 @@ function App() {
     if (orderResponse.ok) setAffiliateOrders(((await orderResponse.json()) as { items: AdminAffiliateOrder[] }).items);
   }
 
+  async function loadPaidAccess() {
+    const [ordersResponse, accountsResponse] = await Promise.all([
+      fetch("/api/admin/article-orders", { credentials: "include" }),
+      fetch("/api/admin/reader-accounts", { credentials: "include" })
+    ]);
+    if (ordersResponse.ok) setArticleOrders(((await ordersResponse.json()) as { items: AdminArticleOrder[] }).items);
+    if (accountsResponse.ok) setReaderAccounts(((await accountsResponse.json()) as { items: AdminReaderAccount[] }).items);
+  }
+
   function openProductWorkspace() {
     setWorkspace("products");
     void loadProducts();
@@ -320,7 +351,7 @@ function App() {
         method: "PUT",
         headers: { "content-type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ title: activePost.title, markdown, visibility: activePost.visibility })
+        body: JSON.stringify({ title: activePost.title, markdown, visibility: activePost.visibility, priceCents: activePost.priceCents, currency: activePost.currency })
       });
 
       if (!response.ok) {
@@ -330,7 +361,7 @@ function App() {
 
       const saved = (await response.json()) as AdminPost;
       setPosts((items) => items.map((item) => (item.id === saved.id ? saved : item)));
-      showToast(saved.visibility === "private" ? "保存成功，仅自己可见" : "保存成功，文章已公开");
+      showToast(saved.visibility === "private" ? "保存成功，仅自己可见" : saved.visibility === "paid" ? "保存成功，购买后可见" : "保存成功，文章已公开");
     } finally {
       setSavingPost(false);
     }
@@ -814,6 +845,10 @@ function App() {
     return <DistributionWorkspace affiliates={affiliates} orders={affiliateOrders} setAffiliates={setAffiliates} setOrders={setAffiliateOrders} onOpenPosts={() => setWorkspace("posts")} onOpenProducts={openProductWorkspace} onOpenTools={openToolsWorkspace} onRefresh={loadDistribution} onLogout={logout} showToast={showToast} toast={toast} />;
   }
 
+  if (workspace === "paid") {
+    return <PaidAccessWorkspace orders={articleOrders} accounts={readerAccounts} setOrders={setArticleOrders} onOpenPosts={() => setWorkspace("posts")} onRefresh={loadPaidAccess} onLogout={logout} showToast={showToast} toast={toast} />;
+  }
+
   return (
     <main className="admin-shell">
       <aside className="post-rail">
@@ -822,6 +857,7 @@ function App() {
           <button type="button" role="tab" aria-selected="false" onClick={openProductWorkspace}>商品</button>
           <button type="button" role="tab" aria-selected="false" onClick={openToolsWorkspace}>工具</button>
           <button type="button" role="tab" aria-selected="false" onClick={() => { setWorkspace("distribution"); void loadDistribution(); }}>分销</button>
+          <button type="button" role="tab" aria-selected="false" onClick={() => { setWorkspace("paid"); void loadPaidAccess(); }}>付费</button>
         </div>
         <div className="rail-head">
           <strong>文章管理</strong>
@@ -875,8 +911,15 @@ function App() {
                 <select value={activePost.visibility} onChange={(event) => patchActivePost({ visibility: event.target.value as AdminPost["visibility"] })}>
                   <option value="public">公开，所有人可见</option>
                   <option value="private">私密，仅自己可见</option>
+                  <option value="paid">付费，购买后可见</option>
                 </select>
               </label>
+              {activePost.visibility === "paid" && (
+                <label className="post-visibility-field">
+                  <span>文章价格（人民币元）</span>
+                  <input type="number" min="0.01" max="1000000" step="0.01" value={(activePost.priceCents / 100).toFixed(2)} onChange={(event) => patchActivePost({ priceCents: Math.round(Number(event.target.value) * 100), currency: "CNY" })} />
+                </label>
+              )}
               <div
                 ref={editorRef}
                 className="rich-editor"
@@ -1336,6 +1379,64 @@ function isHttpUrl(value: string): boolean {
 async function apiErrorMessage(response: Response, fallback: string): Promise<string> {
   const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
   return payload?.error?.message || `${fallback}（${response.status}）`;
+}
+
+function PaidAccessWorkspace({
+  orders,
+  accounts,
+  setOrders,
+  onOpenPosts,
+  onRefresh,
+  onLogout,
+  showToast,
+  toast
+}: {
+  orders: AdminArticleOrder[];
+  accounts: AdminReaderAccount[];
+  setOrders: React.Dispatch<React.SetStateAction<AdminArticleOrder[]>>;
+  onOpenPosts: () => void;
+  onRefresh: () => Promise<void>;
+  onLogout: () => Promise<void>;
+  showToast: (text: string) => void;
+  toast: Toast | null;
+}) {
+  async function updateOrder(order: AdminArticleOrder, status: AdminArticleOrder["status"]) {
+    const response = await fetch(`/api/admin/article-orders/${order.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ status })
+    });
+    if (!response.ok) { showToast("订单状态更新失败"); return; }
+    const payload = (await response.json()) as { order: AdminArticleOrder };
+    setOrders((items) => items.map((item) => item.id === order.id ? payload.order : item));
+    showToast(status === "completed" ? "已确认收款并开通阅读权限" : "订单状态已更新");
+  }
+
+  async function resetReaderPassword(account: AdminReaderAccount) {
+    if (!confirm(`确认重置 ${account.loginName} 的密码并撤销全部登录态？`)) return;
+    const response = await fetch(`/api/admin/reader-accounts/${account.id}/reset-password`, { method: "POST", credentials: "include" });
+    if (!response.ok) { showToast("密码重置失败"); return; }
+    const payload = (await response.json()) as { temporaryPassword: string };
+    prompt("新密码只显示这一次，请安全发送给用户：", payload.temporaryPassword);
+  }
+
+  return (
+    <main className="admin-shell">
+      <aside className="post-rail">
+        <div className="workspace-tabs" role="tablist" aria-label="后台工作区"><button type="button" onClick={onOpenPosts}>文章</button><button className="active" type="button">付费</button></div>
+        <div className="rail-head"><strong>读者账号</strong><span>{accounts.length} 人</span></div>
+        <div className="rail-actions"><button type="button" onClick={() => void onRefresh()}><RefreshCw size={15} />刷新</button><button type="button" onClick={() => void onLogout()}><LogOut size={15} />退出</button></div>
+        <div className="post-list affiliate-list">{accounts.map((account) => <button key={account.id} type="button" onClick={() => void resetReaderPassword(account)}><span>{account.loginName}</span><small>{formatDate(account.createdAt)} · 点击重置密码</small></button>)}</div>
+      </aside>
+      <section className="management-pane">
+        <header className="management-header"><div><p className="section-kicker">Paid access</p><h1>文章购买订单</h1></div><span>{orders.filter((order) => order.status === "pending").length} 个待确认</span></header>
+        <div className="distribution-summary"><div><span>订单总数</span><strong>{orders.length}</strong></div><div><span>待确认</span><strong>{orders.filter((order) => order.status === "pending").length}</strong></div><div><span>已开通</span><strong>{orders.filter((order) => order.status === "completed").length}</strong></div><div><span>成交金额</span><strong>{formatMoney(orders.filter((order) => order.status === "completed").reduce((sum, order) => sum + order.priceCents, 0), "CNY")}</strong></div></div>
+        <section className="distribution-orders"><div className="distribution-table-wrap"><table><thead><tr><th>订单号 / 时间</th><th>账号</th><th>文章</th><th>价格</th><th>状态</th></tr></thead><tbody>{orders.map((order) => <tr key={order.id}><td><strong>{order.orderCode}</strong><small>{formatDate(order.createdAt)}</small></td><td>{order.loginName}</td><td>{order.postTitle}</td><td>{formatMoney(order.priceCents, order.currency)}</td><td><select value={order.status} disabled={order.status === "completed"} onChange={(event) => void updateOrder(order, event.target.value as AdminArticleOrder["status"])}><option value="pending">待收款</option><option value="completed">已收款并开通</option><option value="canceled">已取消</option></select></td></tr>)}</tbody></table>{orders.length === 0 && <p className="empty-table">暂无文章订单</p>}</div></section>
+      </section>
+      {toast && <div className="toast">{toast.text}</div>}
+    </main>
+  );
 }
 
 function DistributionWorkspace({

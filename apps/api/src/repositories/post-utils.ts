@@ -31,7 +31,10 @@ export function toPostListItem(post: StoredPost): PostListItem {
     updatedAt: post.updatedAt,
     viewCount: post.viewCount,
     commentCount: post.commentCount,
-    excerpt: post.excerpt
+    excerpt: post.excerpt,
+    visibility: post.visibility === "paid" ? "paid" : "public",
+    priceCents: post.visibility === "paid" ? post.priceCents : 0,
+    currency: post.currency
   };
 }
 
@@ -40,7 +43,7 @@ export function toSearchDocument(post: StoredPost): SearchDocument {
     id: post.id,
     slug: post.slug,
     title: post.title,
-    body: post.searchText,
+    body: post.visibility === "paid" ? post.excerpt : post.searchText,
     excerpt: post.excerpt,
     updatedAt: post.updatedAt
   };

@@ -8,7 +8,9 @@ export interface StoredPost {
   html: string;
   searchText: string;
   excerpt: string;
-  visibility: "public" | "private";
+  visibility: "public" | "private" | "paid";
+  priceCents: number;
+  currency: string;
   createdAt: string;
   updatedAt: string;
   viewCount: number;
@@ -133,14 +135,18 @@ export interface AffiliateProductView extends StoredProduct {
 export interface CreatePostInput {
   title: string;
   markdown: string;
-  visibility?: "public" | "private";
+  visibility?: "public" | "private" | "paid";
+  priceCents?: number;
+  currency?: string;
 }
 
 export interface UpdatePostInput {
   id: string;
   title: string;
   markdown: string;
-  visibility?: "public" | "private";
+  visibility?: "public" | "private" | "paid";
+  priceCents?: number;
+  currency?: string;
 }
 
 export interface CreateCommentInput {

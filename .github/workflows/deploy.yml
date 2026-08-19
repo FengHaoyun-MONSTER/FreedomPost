@@ -28,6 +28,12 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Setup Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00
+        with:
+          go-version-file: services/paid-access/go.mod
+          cache-dependency-path: services/paid-access/go.sum
+
       - name: Install dependencies
         run: |
           npm config set fetch-retries 5
@@ -48,6 +54,10 @@ jobs:
 
       - name: Test
         run: npm test --workspaces --if-present
+
+      - name: Test Go paid access service
+        working-directory: services/paid-access
+        run: go test -race ./...
 
       - name: Build
         run: npm run build
@@ -76,6 +86,9 @@ jobs:
           VISITOR_HASH_SALT: ${{ secrets.VISITOR_HASH_SALT }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PAID_ARTICLES_ENABLED: "true"
+          PAID_ACCESS_INTERNAL_URL: http://paid-access:8080
+          PAID_ACCESS_INTERNAL_SECRET: ${{ secrets.PAID_ACCESS_INTERNAL_SECRET }}
           PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
           STORAGE_DRIVER: ${{ secrets.STORAGE_DRIVER }}
           ALIYUN_OSS_REGION: ${{ secrets.ALIYUN_OSS_REGION }}
@@ -149,6 +162,7 @@ jobs:
           VISITOR_HASH_SALT: ${{ secrets.VISITOR_HASH_SALT }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PAID_ACCESS_INTERNAL_SECRET: ${{ secrets.PAID_ACCESS_INTERNAL_SECRET }}
           PREVIEW_DOMAIN: ${{ secrets.PREVIEW_DOMAIN }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           STORAGE_DRIVER: ${{ secrets.STORAGE_DRIVER }}
@@ -178,7 +192,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           password: ${{ secrets.DEPLOY_KEY == '' && secrets.DEPLOY_PASSWORD || '' }}
           key: ${{ secrets.DEPLOY_KEY }}
-          envs: DEPLOY_PATH,COOKIE_SECRET,VISITOR_HASH_SALT,ADMIN_PASSWORD,POSTGRES_PASSWORD,PREVIEW_DOMAIN,DEPLOY_HOST,STORAGE_DRIVER,ALIYUN_OSS_REGION,ALIYUN_OSS_BUCKET,ALIYUN_OSS_ENDPOINT,ALIYUN_OSS_PUBLIC_BASE_URL,ALIYUN_OSS_PREFIX,ALIYUN_OSS_ACCESS_KEY_ID,ALIYUN_OSS_ACCESS_KEY_SECRET,R2_ACCOUNT_ID,R2_BUCKET,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_ENDPOINT,R2_PUBLIC_BASE_URL,R2_PREFIX,TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,OPUS8_INTEGRATION_BASE_URL,OPUS8_INTEGRATION_KEY_ID,OPUS8_INTEGRATION_SECRET,BENEFIT_CLAIM_HMAC_SECRET,BENEFIT_LINK_ENCRYPTION_KEY
+          envs: DEPLOY_PATH,COOKIE_SECRET,VISITOR_HASH_SALT,ADMIN_PASSWORD,POSTGRES_PASSWORD,PAID_ACCESS_INTERNAL_SECRET,PREVIEW_DOMAIN,DEPLOY_HOST,STORAGE_DRIVER,ALIYUN_OSS_REGION,ALIYUN_OSS_BUCKET,ALIYUN_OSS_ENDPOINT,ALIYUN_OSS_PUBLIC_BASE_URL,ALIYUN_OSS_PREFIX,ALIYUN_OSS_ACCESS_KEY_ID,ALIYUN_OSS_ACCESS_KEY_SECRET,R2_ACCOUNT_ID,R2_BUCKET,R2_ACCESS_KEY_ID,R2_SECRET_ACCESS_KEY,R2_ENDPOINT,R2_PUBLIC_BASE_URL,R2_PREFIX,TURNSTILE_SITE_KEY,TURNSTILE_SECRET_KEY,OPUS8_INTEGRATION_BASE_URL,OPUS8_INTEGRATION_KEY_ID,OPUS8_INTEGRATION_SECRET,BENEFIT_CLAIM_HMAC_SECRET,BENEFIT_LINK_ENCRYPTION_KEY
           command_timeout: 30m
           script: |
             set -eu
@@ -205,6 +219,10 @@ jobs:
                 printf '%s\n' "COOKIE_SECURE=true"
                 printf '%s\n' "TRUST_PROXY=true"
                 printf '%s\n' "REDIS_URL=redis://redis:6379"
+                printf '%s\n' "PAID_ARTICLES_ENABLED=true"
+                printf '%s\n' "PAID_ACCESS_INTERNAL_URL=http://paid-access:8080"
+                printf 'PAID_ACCESS_INTERNAL_SECRET=%s\n' "$PAID_ACCESS_INTERNAL_SECRET"
+                printf '%s\n' "PAID_ACCESS_WECHAT_IMAGE_URL=/images/contact-wechat.jpg"
                 printf '%s\n' "API_BODY_LIMIT_BYTES=104857600"
                 printf '%s\n' "UPLOAD_MAX_BYTES=524288000"
                 printf 'COOKIE_SECRET=%s\n' "$COOKIE_SECRET"
@@ -270,6 +288,10 @@ jobs:
             set_env "COOKIE_SECURE" "true"
             set_env "TRUST_PROXY" "true"
             set_env "REDIS_URL" "redis://redis:6379"
+            set_env "PAID_ARTICLES_ENABLED" "true"
+            set_env "PAID_ACCESS_INTERNAL_URL" "http://paid-access:8080"
+            set_env "PAID_ACCESS_INTERNAL_SECRET" "$PAID_ACCESS_INTERNAL_SECRET"
+            set_env "PAID_ACCESS_WECHAT_IMAGE_URL" "/images/contact-wechat.jpg"
             set_env "COOKIE_SECRET" "$COOKIE_SECRET"
             set_env "VISITOR_HASH_SALT" "$VISITOR_HASH_SALT"
             set_env "ADMIN_PASSWORD" "$ADMIN_PASSWORD"
@@ -419,14 +441,16 @@ jobs:
             docker_cmd builder prune --all --force || true
             docker_cmd image prune --all --force || true
             docker_cmd system df || true
-            compose --env-file .env -f deploy/docker-compose.yml build app nginx
+            compose --env-file .env -f deploy/docker-compose.yml build app paid-access nginx
             compose --env-file .env -f deploy/docker-compose.yml run --rm app node deploy/production-preflight.mjs --runtime
             compose --env-file .env -f deploy/docker-compose.yml run --rm app node deploy/integration-staging-smoke.mjs
             compose --env-file .env -f deploy/docker-compose.yml run --rm app npm run db:migrate:prod -w @freedompost/api
-            compose --env-file .env -f deploy/docker-compose.yml up -d --force-recreate app nginx
+            compose --env-file .env -f deploy/docker-compose.yml up -d --force-recreate app paid-access nginx
             for attempt in $(seq 1 60); do
               if compose --env-file .env -f deploy/docker-compose.yml exec -T app node -e "fetch('http://127.0.0.1:3000/health').then(r=>{if(!r.ok)process.exit(1)})" \
                 && curl -kfsS --resolve "$PREVIEW_DOMAIN:443:127.0.0.1" "https://$PREVIEW_DOMAIN/health" >/dev/null \
+                && curl -kfsS --resolve "$PREVIEW_DOMAIN:443:127.0.0.1" -D /tmp/paid-access-health.headers "https://$PREVIEW_DOMAIN/api/reader/config" | grep -q '"enabled":true' \
+                && grep -qi '^cache-control:.*no-store' /tmp/paid-access-health.headers \
                 && curl -kfsS --resolve "$PREVIEW_DOMAIN:443:127.0.0.1" -D /tmp/benefit-health.headers "https://$PREVIEW_DOMAIN/api/benefits/webmaster" >/dev/null \
                 && grep -qi '^cache-control:.*no-store' /tmp/benefit-health.headers; then
                 exit 0
@@ -434,5 +458,5 @@ jobs:
               sleep 2
             done
             compose --env-file .env -f deploy/docker-compose.yml ps
-            compose --env-file .env -f deploy/docker-compose.yml logs --tail=120 app nginx
+            compose --env-file .env -f deploy/docker-compose.yml logs --tail=120 app paid-access nginx
             exit 1

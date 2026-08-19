@@ -26,6 +26,7 @@ import {
   type AffiliateOrderStatus,
   type ContentRepository,
   type ProductInput,
+  type StoredPost,
   type ToolInput
 } from "./repositories/index.js";
 import { createStorageAdapter, getLocalUploadStream } from "./storage.js";
@@ -34,6 +35,11 @@ import {
   type WebmasterBenefitRouteDependencies
 } from "./benefits/benefit-routes.js";
 import { createWebmasterBenefitRuntime } from "./benefits/benefit-runtime.js";
+import {
+  createPaidAccessClient,
+  type ArticleOrderStatus,
+  type PaidAccessClient
+} from "./paid-access-client.js";
 
 const sessions = new Map<string, { username: string; createdAt: string }>();
 const affiliateSessions = new Map<string, { affiliateId: string; wechatId: string; createdAt: string }>();
@@ -54,12 +60,15 @@ export interface BuildAppOptions {
   benefit?: WebmasterBenefitRouteDependencies | null;
   corsAllowedOrigins?: string[];
   trustProxy?: boolean;
+  paidAccess?: PaidAccessClient | null;
 }
 
 export const BENEFIT_LOG_REDACT_PATHS = [
   "req.headers.cookie",
   "req.headers.authorization",
   "req.headers['x-opus8-integration-signature']",
+  "req.headers['x-freedompost-signature']",
+  "req.body.password",
   "req.body.turnstileToken",
   "res.headers.set-cookie"
 ] as const;
@@ -67,6 +76,7 @@ export const BENEFIT_LOG_REDACT_PATHS = [
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const repository = options.repository ?? createContentRepository();
   const storage = createStorageAdapter();
+  const paidAccess = options.paidAccess === undefined ? createPaidAccessClient() : options.paidAccess;
   const app = Fastify({
     bodyLimit: Number(process.env.API_BODY_LIMIT_BYTES ?? 100 * 1024 * 1024),
     trustProxy: options.trustProxy ?? process.env.TRUST_PROXY === "true",
@@ -78,6 +88,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       }
     }
   });
+  async function canReadPost(post: StoredPost | null, sessionToken: string | undefined): Promise<boolean> {
+    if (!post || post.visibility === "private") return false;
+    if (post.visibility === "public") return true;
+    if (!paidAccess) return false;
+    try {
+      return await paidAccess.canRead(sessionToken, post.slug);
+    } catch (error) {
+      app.log.warn({ errorName: error instanceof Error ? error.name : "unknown" }, "Paid access authorization failed closed");
+      return false;
+    }
+  }
   const benefitRuntime = options.benefit === undefined
     ? createWebmasterBenefitRuntime(process.env, {
         secureCookies: shouldUseSecureCookies(),
@@ -327,7 +348,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     Body: { fingerprint?: string; localId?: string };
   }>("/api/posts/:slug/view", async (request, reply) => {
     const post = await repository.getPostBySlug(request.params.slug);
-    if (!post || post.visibility !== "public") {
+    if (!post || !await canReadPost(post, request.cookies.fp_reader_session)) {
       return reply.code(404).send(errorBody("POST_NOT_FOUND", "文章不存在"));
     }
     const date = new Date().toISOString().slice(0, 10);
@@ -356,7 +377,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   app.get<{ Params: { slug: string } }>("/api/posts/:slug/comments", async (request, reply) => {
     const post = await repository.getPostBySlug(request.params.slug);
-    if (!post || post.visibility !== "public") {
+    if (!post || !await canReadPost(post, request.cookies.fp_reader_session)) {
       return reply.code(404).send(errorBody("POST_NOT_FOUND", "文章不存在"));
     }
     return { items: await repository.listComments(request.params.slug), nextCursor: null };
@@ -364,7 +385,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   app.post<{ Params: { slug: string } }>("/api/posts/:slug/comment-attachments", async (request, reply) => {
     const post = await repository.getPostBySlug(request.params.slug);
-    if (!post || post.visibility !== "public") {
+    if (!post || !await canReadPost(post, request.cookies.fp_reader_session)) {
       return reply.code(404).send(errorBody("POST_NOT_FOUND", "文章不存在"));
     }
 
@@ -421,7 +442,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     };
   }>("/api/posts/:slug/comments", async (request, reply) => {
     const post = await repository.getPostBySlug(request.params.slug);
-    if (!post || post.visibility !== "public") {
+    if (!post || !await canReadPost(post, request.cookies.fp_reader_session)) {
       return reply.code(404).send(errorBody("POST_NOT_FOUND", "文章不存在"));
     }
 
@@ -518,6 +539,56 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
     }
     return { admin: session };
+  });
+
+  app.get("/api/admin/article-orders", async (request, reply) => {
+    const session = getSession(request.cookies.fp_session);
+    if (!session) return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
+    if (!paidAccess) return reply.code(503).send(errorBody("PAID_ACCESS_DISABLED", "付费文章服务未启用"));
+    try {
+      return await paidAccess.listOrders(session.username);
+    } catch (error) {
+      request.log.error({ errorName: error instanceof Error ? error.name : "unknown" }, "Failed to list article orders");
+      return reply.code(502).send(errorBody("PAID_ACCESS_UNAVAILABLE", "付费文章服务暂不可用"));
+    }
+  });
+
+  app.patch<{ Params: { id: string }; Body: { status?: string } }>("/api/admin/article-orders/:id", async (request, reply) => {
+    const session = getSession(request.cookies.fp_session);
+    if (!session) return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
+    if (!paidAccess) return reply.code(503).send(errorBody("PAID_ACCESS_DISABLED", "付费文章服务未启用"));
+    const status = normalizeArticleOrderStatus(request.body?.status);
+    if (!status) return reply.code(400).send(errorBody("INVALID_ORDER_STATE", "订单状态无效"));
+    try {
+      return await paidAccess.updateOrder(session.username, request.params.id, status);
+    } catch (error) {
+      request.log.error({ errorName: error instanceof Error ? error.name : "unknown" }, "Failed to update article order");
+      return reply.code(502).send(errorBody("PAID_ACCESS_UNAVAILABLE", "订单状态更新失败"));
+    }
+  });
+
+  app.get("/api/admin/reader-accounts", async (request, reply) => {
+    const session = getSession(request.cookies.fp_session);
+    if (!session) return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
+    if (!paidAccess) return reply.code(503).send(errorBody("PAID_ACCESS_DISABLED", "付费文章服务未启用"));
+    try {
+      return await paidAccess.listAccounts(session.username);
+    } catch (error) {
+      request.log.error({ errorName: error instanceof Error ? error.name : "unknown" }, "Failed to list reader accounts");
+      return reply.code(502).send(errorBody("PAID_ACCESS_UNAVAILABLE", "读者账号服务暂不可用"));
+    }
+  });
+
+  app.post<{ Params: { id: string } }>("/api/admin/reader-accounts/:id/reset-password", async (request, reply) => {
+    const session = getSession(request.cookies.fp_session);
+    if (!session) return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
+    if (!paidAccess) return reply.code(503).send(errorBody("PAID_ACCESS_DISABLED", "付费文章服务未启用"));
+    try {
+      return await paidAccess.resetPassword(session.username, request.params.id);
+    } catch (error) {
+      request.log.error({ errorName: error instanceof Error ? error.name : "unknown" }, "Failed to reset reader password");
+      return reply.code(502).send(errorBody("PAID_ACCESS_UNAVAILABLE", "密码重置失败"));
+    }
   });
 
   app.get("/api/admin/posts", async (request, reply) => {
@@ -697,16 +768,20 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.post<{
-    Body: { title?: string; markdown?: string; visibility?: string };
+    Body: { title?: string; markdown?: string; visibility?: string; priceCents?: number; currency?: string };
   }>("/api/admin/posts", async (request, reply) => {
     if (!getSession(request.cookies.fp_session)) {
       return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
     }
 
+    const commercial = normalizePostCommercialInput(request.body);
+    if (!commercial) {
+      return reply.code(400).send(errorBody("INVALID_POST_PRICING", "付费文章价格必须为大于 0 的整数分"));
+    }
     const post = await repository.createPost({
       title: request.body?.title?.trim() || "未命名文章",
       markdown: request.body?.markdown ?? "",
-      visibility: request.body?.visibility === "private" ? "private" : "public"
+      ...commercial
     });
 
     return reply.code(201).send(post);
@@ -714,7 +789,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   app.put<{
     Params: { id: string };
-    Body: { title?: string; markdown?: string; visibility?: string };
+    Body: { title?: string; markdown?: string; visibility?: string; priceCents?: number; currency?: string };
   }>("/api/admin/posts/:id", async (request, reply) => {
     if (!getSession(request.cookies.fp_session)) {
       return reply.code(401).send(errorBody("UNAUTHENTICATED", "未登录"));
@@ -727,11 +802,15 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
     const nextMarkdown = request.body?.markdown ?? existing.markdown;
     const removedAssetKeys = diffRemovedManagedStorageKeys(existing.markdown, nextMarkdown);
+    const commercial = normalizePostCommercialInput(request.body, existing);
+    if (!commercial) {
+      return reply.code(400).send(errorBody("INVALID_POST_PRICING", "付费文章价格必须为大于 0 的整数分"));
+    }
     const updated = await repository.updatePost({
       id: request.params.id,
       title: request.body?.title?.trim() || existing.title,
       markdown: nextMarkdown,
-      visibility: request.body?.visibility === "private" ? "private" : request.body?.visibility === "public" ? "public" : existing.visibility
+      ...commercial
     });
 
     if (!updated) {
@@ -827,6 +906,24 @@ function normalizeProductInput(value: unknown): ProductInput | null {
   return { title, summary, description, category, priceCents, commissionCents, compareAtCents, currency, stock, soldCount, coverUrl, status, sortOrder };
 }
 
+function normalizePostCommercialInput(
+  value: { visibility?: string; priceCents?: number; currency?: string } | undefined,
+  existing?: Pick<StoredPost, "visibility" | "priceCents" | "currency">
+): Pick<StoredPost, "visibility" | "priceCents" | "currency"> | null {
+  const requestedVisibility = value?.visibility;
+  const visibility = requestedVisibility === "public" || requestedVisibility === "private" || requestedVisibility === "paid"
+    ? requestedVisibility
+    : existing?.visibility ?? "public";
+  const priceCents = value?.priceCents ?? existing?.priceCents ?? 0;
+  const currency = (value?.currency ?? existing?.currency ?? "CNY").trim().toUpperCase();
+
+  if (!Number.isSafeInteger(priceCents) || priceCents < 0 || priceCents > 100_000_000) return null;
+  if (!/^[A-Z]{3,8}$/.test(currency)) return null;
+  if (visibility === "paid" && priceCents <= 0) return null;
+
+  return { visibility, priceCents, currency };
+}
+
 function normalizeToolInput(value: unknown): ToolInput | null {
   if (!value || typeof value !== "object") return null;
   const input = value as Record<string, unknown>;
@@ -858,6 +955,10 @@ function normalizeWechatId(value: unknown): string | null {
 }
 
 function normalizeOrderStatus(value: unknown): AffiliateOrderStatus | null {
+  return value === "pending" || value === "completed" || value === "canceled" ? value : null;
+}
+
+function normalizeArticleOrderStatus(value: unknown): ArticleOrderStatus | null {
   return value === "pending" || value === "completed" || value === "canceled" ? value : null;
 }
 
