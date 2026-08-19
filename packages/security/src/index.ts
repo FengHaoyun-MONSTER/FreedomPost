@@ -85,6 +85,9 @@ const articleAllowedClasses = [
   "footnotes",
   "footnotes-list",
   "footnotes-sep",
+  "fp-callout",
+  "fp-callout-content",
+  "fp-callout-emoji",
   "fp-color-blue",
   "fp-color-gold",
   "fp-color-green",
@@ -152,6 +155,7 @@ export function sanitizeArticleHtml(html: string): string {
     allowedTags: [
       "a",
       "article",
+      "aside",
       "blockquote",
       "br",
       "caption",
@@ -195,7 +199,7 @@ export function sanitizeArticleHtml(html: string): string {
     ],
     allowedAttributes: {
       a: ["href", "name", "target", "rel", "class"],
-      "*": ["id", "class", "data-lang", "aria-hidden"],
+      "*": ["id", "class", "data-lang", "aria-hidden", "role"],
       img: ["src", "alt", "title", "width", "height", "loading"],
       input: ["type", "checked", "disabled"],
       code: ["class"],
