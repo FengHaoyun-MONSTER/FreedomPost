@@ -62,6 +62,7 @@ function dependencies(overrides: Partial<WebmasterBenefitRouteDependencies> = {}
     networkDailyLimit: 3,
     claimMinuteLimit: 6,
     secureCookies: true,
+    now: () => Date.parse("2026-08-01T00:00:00.000Z"),
     ...overrides
   } satisfies WebmasterBenefitRouteDependencies;
 }

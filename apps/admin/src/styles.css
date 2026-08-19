@@ -399,6 +399,93 @@ button:hover {
   line-height: 1.6;
 }
 
+.editor-callout {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  margin: 16px 0;
+  padding: 15px 16px;
+  border: 1px solid #f2b56b;
+  border-radius: 10px;
+  background: #fff7ed;
+}
+
+.editor-callout-emoji-shell {
+  position: relative;
+  align-self: start;
+}
+
+.editor-callout-emoji-trigger,
+.editor-callout-emoji-option {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  line-height: 1;
+}
+
+.editor-callout-emoji-trigger {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 7px;
+  font-size: 20px;
+}
+
+.editor-callout-emoji-trigger:hover,
+.editor-callout-emoji-trigger:focus-visible,
+.editor-callout-emoji-option:hover,
+.editor-callout-emoji-option:focus-visible {
+  background: rgba(240, 151, 50, 0.15);
+  outline: 2px solid rgba(196, 112, 22, 0.35);
+  outline-offset: 1px;
+}
+
+.editor-callout-emoji-picker {
+  position: absolute;
+  top: 38px;
+  left: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: repeat(4, 32px);
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid #e4b678;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(77, 47, 14, 0.18);
+}
+
+.editor-callout-emoji-picker[hidden] {
+  display: none;
+}
+
+.editor-callout-emoji-option {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 6px;
+  font-size: 18px;
+}
+
+.editor-callout-emoji-option[aria-selected="true"] {
+  background: #ffead1;
+}
+
+.editor-callout-content {
+  min-width: 0;
+  outline: none;
+}
+
+.editor-callout-content > :first-child {
+  margin-top: 0;
+}
+
+.editor-callout-content > :last-child {
+  margin-bottom: 0;
+}
+
 .editor-image {
   margin: 16px 0;
 }

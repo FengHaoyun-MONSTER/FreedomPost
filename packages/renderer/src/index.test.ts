@@ -110,6 +110,41 @@ describe("renderMarkdownArticle", () => {
     expect(result.html).not.toContain("<iframe");
     expect(result.html).not.toContain("evil.example");
   });
+
+  it("renders a multi-block callout with existing rich content", () => {
+    const result = renderMarkdownArticle({
+      slug: "callout",
+      title: "Callout",
+      markdown:
+        ':::callout{emoji="💡"}\n**Important** paragraph\n\n- First\n- Second\n\n::youtube[dQw4w9WgXcQ]\n:::',
+      createdAt: "2026-07-02T00:00:00.000Z",
+      updatedAt: "2026-07-02T00:00:00.000Z"
+    });
+
+    expect(result.html).toContain('<aside class="fp-callout" role="note">');
+    expect(result.html).toContain('<span class="fp-callout-emoji" aria-hidden="true">💡</span>');
+    expect(result.html).toContain("<strong>Important</strong>");
+    expect(result.html).toContain("<ul>");
+    expect(result.html).toContain('class="youtube-embed"');
+    expect(result.searchText).toContain("Important paragraph First Second");
+    expect(result.searchText).not.toContain("💡");
+  });
+
+  it("normalizes untrusted callout metadata and sanitizes its content", () => {
+    const result = renderMarkdownArticle({
+      slug: "safe-callout",
+      title: "Safe callout",
+      markdown: ':::callout{emoji="<img>"}\n<span onclick="alert(1)" class="bad-class">Safe</span>\n:::',
+      createdAt: "2026-07-02T00:00:00.000Z",
+      updatedAt: "2026-07-02T00:00:00.000Z"
+    });
+
+    expect(result.html).toContain("fp-callout");
+    expect(result.html).toContain("Safe");
+    expect(result.html).not.toContain("onclick");
+    expect(result.html).not.toContain("bad-class");
+    expect(result.html).not.toContain("<img>");
+  });
 });
 
 describe("YouTube link parsing", () => {

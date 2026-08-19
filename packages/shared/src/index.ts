@@ -105,6 +105,76 @@ export interface YouTubeVideo {
   startSeconds: number;
 }
 
+export const CALLOUT_EMOJI_OPTIONS = ["⛱️", "💡", "⚠️", "✅", "📌", "🚀", "❤️", "🔔"] as const;
+export const CALLOUT_DEFAULT_EMOJI = CALLOUT_EMOJI_OPTIONS[0];
+
+export type CalloutEmoji = (typeof CALLOUT_EMOJI_OPTIONS)[number];
+export type CalloutMarkdownSegment =
+  | { type: "markdown"; markdown: string }
+  | { type: "callout"; emoji: CalloutEmoji; markdown: string };
+
+const calloutStartPattern = /^:::callout(?:\{emoji="([^"]{0,64})"\})?\s*$/;
+const markdownFencePattern = /^\s*(`{3,}|~{3,})/;
+
+export function normalizeCalloutEmoji(value: string | null | undefined): CalloutEmoji {
+  return CALLOUT_EMOJI_OPTIONS.find((emoji) => emoji === value) ?? CALLOUT_DEFAULT_EMOJI;
+}
+
+export function splitCalloutBlocks(markdown: string): CalloutMarkdownSegment[] {
+  const lines = markdown.split(/\r?\n/);
+  const segments: CalloutMarkdownSegment[] = [];
+  let plainStart = 0;
+  let plainFence: { marker: string; length: number } | null = null;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    plainFence = nextMarkdownFence(lines[index] ?? "", plainFence);
+    if (plainFence) continue;
+
+    const start = lines[index]?.match(calloutStartPattern);
+    if (!start) continue;
+
+    let closingIndex = index + 1;
+    let contentFence: { marker: string; length: number } | null = null;
+    while (closingIndex < lines.length) {
+      contentFence = nextMarkdownFence(lines[closingIndex] ?? "", contentFence);
+      if (!contentFence && lines[closingIndex]?.trim() === ":::") break;
+      closingIndex += 1;
+    }
+    if (closingIndex >= lines.length) continue;
+
+    const before = lines.slice(plainStart, index).join("\n");
+    if (before) segments.push({ type: "markdown", markdown: before });
+    segments.push({
+      type: "callout",
+      emoji: normalizeCalloutEmoji(start[1]),
+      markdown: lines.slice(index + 1, closingIndex).join("\n")
+    });
+    plainStart = closingIndex + 1;
+    index = closingIndex;
+  }
+
+  const after = lines.slice(plainStart).join("\n");
+  if (after || segments.length === 0) segments.push({ type: "markdown", markdown: after });
+  return segments;
+}
+
+function nextMarkdownFence(
+  line: string,
+  current: { marker: string; length: number } | null
+): { marker: string; length: number } | null {
+  const match = line.match(markdownFencePattern);
+  if (!match?.[1]) return current;
+
+  const marker = match[1][0] ?? "";
+  if (!current) return { marker, length: match[1].length };
+  return marker === current.marker && match[1].length >= current.length ? null : current;
+}
+
+export function calloutDirective(emoji: string, markdown: string): string {
+  const content = markdown.replace(/^\n+|\n+$/g, "");
+  return `:::callout{emoji="${normalizeCalloutEmoji(emoji)}"}\n${content}\n:::`;
+}
+
 const youtubeVideoIdPattern = /^[A-Za-z0-9_-]{11}$/;
 const youtubeDirectivePattern = /^::youtube\[([A-Za-z0-9_-]{11})(?:\?start=(\d+))?]$/;
 

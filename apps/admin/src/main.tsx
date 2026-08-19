@@ -1,4 +1,13 @@
-import { type ClipboardEvent, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ClipboardEvent,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { createRoot } from "react-dom/client";
 import {
   Bold,
@@ -18,7 +27,16 @@ import {
   Upload,
   Video
 } from "lucide-react";
-import { parseYouTubeDirective, parseYouTubeVideoInput, youtubeDirective } from "@freedompost/shared";
+import {
+  CALLOUT_DEFAULT_EMOJI,
+  calloutDirective,
+  normalizeCalloutEmoji,
+  parseYouTubeDirective,
+  parseYouTubeVideoInput,
+  splitCalloutBlocks,
+  youtubeDirective
+} from "@freedompost/shared";
+import { editorCalloutHtml } from "./editor-callout.js";
 import { editorImageHtml, editorImagesMarkdown, editorYouTubeHtml } from "./editor-media.js";
 import { startPendingMediaInsertion } from "./pending-media-insertion.js";
 import { PendingTaskBarrier } from "./pending-task-barrier.js";
@@ -115,7 +133,8 @@ const headingOptions = [
   { label: "正文", value: "p" },
   { label: "标题 1", value: "h1" },
   { label: "标题 2", value: "h2" },
-  { label: "标题 3", value: "h3" }
+  { label: "标题 3", value: "h3" },
+  { label: "高亮块", value: "callout" }
 ] as const;
 
 const sizeOptions = [
@@ -426,7 +445,8 @@ function App() {
     const selection = window.getSelection();
     if (selection?.rangeCount && editor.contains(selection.anchorNode)) {
       const range = selection.getRangeAt(0);
-      const topLevelNode = closestEditorChild(selection.anchorNode, editor);
+      const container = closestCalloutContent(selection.anchorNode, editor) ?? editor;
+      const topLevelNode = closestEditorChild(selection.anchorNode, container);
       if (topLevelNode) topLevelNode.after(placeholder);
       else {
         range.deleteContents();
@@ -474,7 +494,8 @@ function App() {
 
     if (selection?.rangeCount && editor.contains(selection.anchorNode)) {
       const range = selection.getRangeAt(0);
-      const topLevelNode = closestEditorChild(selection.anchorNode, editor);
+      const container = closestCalloutContent(selection.anchorNode, editor) ?? editor;
+      const topLevelNode = closestEditorChild(selection.anchorNode, container);
       if (insertsRichBlock && topLevelNode) {
         topLevelNode.after(fragment);
       } else {
@@ -568,6 +589,135 @@ function App() {
     insertHtmlAtCaret('<pre data-lang="ts"><code>// code</code></pre><p><br></p>');
   }
 
+  function insertCallout() {
+    if (!activePost) return;
+    restoreEditorSelection();
+
+    const editor = editorRef.current;
+    const selection = window.getSelection();
+    if (!editor) return;
+
+    if (selection?.anchorNode && closestCalloutContent(selection.anchorNode, editor)) {
+      showToast("高亮块不能嵌套");
+      return;
+    }
+
+    const template = document.createElement("template");
+    template.innerHTML = editorCalloutHtml("", CALLOUT_DEFAULT_EMOJI);
+    const callout = template.content.firstElementChild;
+    const content = callout?.querySelector<HTMLElement>(".editor-callout-content");
+    if (!(callout instanceof HTMLElement) || !content) return;
+
+    let selectedNodes: ChildNode[] = [];
+    if (selection?.rangeCount && editor.contains(selection.anchorNode)) {
+      const range = selection.getRangeAt(0);
+      const startNode = closestEditorChild(range.startContainer, editor);
+      const endNode = closestEditorChild(range.endContainer, editor) ?? startNode;
+      const children = [...editor.childNodes];
+      const startIndex = startNode ? children.indexOf(startNode) : -1;
+      const endIndex = endNode ? children.indexOf(endNode) : startIndex;
+      if (startIndex >= 0 && endIndex >= startIndex) {
+        selectedNodes = children.slice(startIndex, endIndex + 1);
+      }
+    }
+
+    if (selectedNodes.some((node) => node instanceof Element && (node.matches('[data-fp-type="callout"]') || node.querySelector('[data-fp-type="callout"]')))) {
+      showToast("高亮块不能嵌套");
+      return;
+    }
+
+    if (selectedNodes.length) {
+      selectedNodes[0]?.before(callout);
+      content.replaceChildren(...selectedNodes);
+    } else {
+      editor.append(callout);
+    }
+
+    if (!callout.nextSibling) {
+      const trailingParagraph = document.createElement("p");
+      trailingParagraph.append(document.createElement("br"));
+      callout.after(trailingParagraph);
+    }
+
+    const focusTarget = content.querySelector<HTMLElement>("p,h1,h2,h3,h4,h5,h6,li,pre") ?? content;
+    const nextRange = document.createRange();
+    nextRange.selectNodeContents(focusTarget);
+    nextRange.collapse(false);
+    selection?.removeAllRanges();
+    selection?.addRange(nextRange);
+    savedRangeRef.current = nextRange.cloneRange();
+    syncEditorMarkdown();
+    showToast("高亮块已插入");
+  }
+
+  function handleEditorClick(event: ReactMouseEvent<HTMLDivElement>) {
+    const target = event.target instanceof Element ? event.target : null;
+    const option = target?.closest<HTMLButtonElement>("[data-callout-emoji-option]");
+    if (option) {
+      event.preventDefault();
+      const callout = option.closest<HTMLElement>('[data-fp-type="callout"]');
+      const emoji = normalizeCalloutEmoji(option.dataset.calloutEmojiOption);
+      const trigger = callout?.querySelector<HTMLElement>("[data-callout-emoji-trigger]");
+      const picker = callout?.querySelector<HTMLElement>("[data-callout-emoji-picker]");
+      if (!callout || !trigger || !picker) return;
+
+      callout.dataset.emoji = emoji;
+      trigger.textContent = emoji;
+      trigger.setAttribute("aria-expanded", "false");
+      picker.hidden = true;
+      picker.querySelectorAll<HTMLElement>("[data-callout-emoji-option]").forEach((item) => {
+        item.setAttribute("aria-selected", String(item.dataset.calloutEmojiOption === emoji));
+      });
+      syncEditorMarkdown();
+      return;
+    }
+
+    const trigger = target?.closest<HTMLElement>("[data-callout-emoji-trigger]");
+    if (trigger) {
+      event.preventDefault();
+      toggleCalloutEmojiPicker(trigger);
+    }
+  }
+
+  function handleEditorKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    const target = event.target instanceof Element ? event.target : null;
+    const trigger = target?.closest<HTMLElement>("[data-callout-emoji-trigger]");
+    if (trigger && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      toggleCalloutEmojiPicker(trigger);
+      return;
+    }
+
+    if (event.key === "Escape") {
+      const callout = target?.closest<HTMLElement>('[data-fp-type="callout"]');
+      const picker = callout?.querySelector<HTMLElement>("[data-callout-emoji-picker]");
+      const emojiTrigger = callout?.querySelector<HTMLElement>("[data-callout-emoji-trigger]");
+      if (picker && emojiTrigger && !picker.hidden) {
+        picker.hidden = true;
+        emojiTrigger.setAttribute("aria-expanded", "false");
+        emojiTrigger.focus();
+      }
+    }
+  }
+
+  function toggleCalloutEmojiPicker(trigger: HTMLElement) {
+    const editor = editorRef.current;
+    const callout = trigger.closest<HTMLElement>('[data-fp-type="callout"]');
+    const picker = callout?.querySelector<HTMLElement>("[data-callout-emoji-picker]");
+    if (!editor || !picker) return;
+
+    const willOpen = picker.hidden;
+    editor.querySelectorAll<HTMLElement>("[data-callout-emoji-picker]").forEach((item) => {
+      item.hidden = true;
+    });
+    editor.querySelectorAll<HTMLElement>("[data-callout-emoji-trigger]").forEach((item) => {
+      item.setAttribute("aria-expanded", "false");
+    });
+    picker.hidden = !willOpen;
+    trigger.setAttribute("aria-expanded", String(willOpen));
+    if (willOpen) picker.querySelector<HTMLElement>("[data-callout-emoji-option]")?.focus();
+  }
+
   function insertYouTubeVideo() {
     const input = prompt("粘贴 YouTube 视频链接");
     if (!input) return;
@@ -583,12 +733,18 @@ function App() {
     showToast("YouTube 视频已插入");
   }
 
-  function closestEditorChild(node: Node | null, editor: HTMLElement): ChildNode | null {
+  function closestEditorChild(node: Node | null, container: HTMLElement): ChildNode | null {
     let current = node;
-    while (current?.parentNode && current.parentNode !== editor) {
+    while (current?.parentNode && current.parentNode !== container) {
       current = current.parentNode;
     }
-    return current?.parentNode === editor ? (current as ChildNode) : null;
+    return current?.parentNode === container ? (current as ChildNode) : null;
+  }
+
+  function closestCalloutContent(node: Node | null, editor: HTMLElement): HTMLElement | null {
+    const element = node instanceof Element ? node : node?.parentElement;
+    const content = element?.closest<HTMLElement>(".editor-callout-content") ?? null;
+    return content && editor.contains(content) ? content : null;
   }
 
   function syncEditorMarkdown() {
@@ -730,16 +886,19 @@ function App() {
                 aria-label="文章正文"
                 onInput={syncEditorMarkdown}
                 onPaste={handleEditorPaste}
+                onClick={handleEditorClick}
+                onKeyDown={handleEditorKeyDown}
               />
             </div>
             <div className="toolbar" aria-label="编辑工具栏">
               <label className="toolbar-field">
                 <Type size={15} aria-hidden="true" />
                 <select
-                  aria-label="标题级别"
+                  aria-label="块类型"
                   defaultValue="p"
                   onChange={(event) => {
-                    applyBlockFormat(event.target.value);
+                    if (event.target.value === "callout") insertCallout();
+                    else applyBlockFormat(event.target.value);
                     event.target.value = "p";
                   }}
                 >
@@ -1403,16 +1562,36 @@ function filenameWithImageExtension(name: string, mimeType: string): string {
 }
 
 function markdownToEditorHtml(markdown: string): string {
+  const html = splitCalloutBlocks(markdown)
+    .map((segment) =>
+      segment.type === "callout"
+        ? editorCalloutHtml(markdownFragmentToEditorHtml(segment.markdown), segment.emoji)
+        : markdownFragmentToEditorHtml(segment.markdown)
+    )
+    .join("");
+  return html || "<p><br></p>";
+}
+
+function markdownFragmentToEditorHtml(markdown: string): string {
   const lines = markdown.split(/\r?\n/);
   const html: string[] = [];
   let paragraph: string[] = [];
   let codeLines: string[] | null = null;
   let codeLang = "";
+  let listItems: string[] = [];
+  let listOrdered = false;
 
   const flushParagraph = () => {
     if (!paragraph.length) return;
     html.push(`<p>${formatInlineMarkdown(paragraph.join("<br>"))}</p>`);
     paragraph = [];
+  };
+
+  const flushList = () => {
+    if (!listItems.length) return;
+    const tagName = listOrdered ? "ol" : "ul";
+    html.push(`<${tagName}>${listItems.map((item) => `<li>${formatInlineMarkdown(escapeHtml(item))}</li>`).join("")}</${tagName}>`);
+    listItems = [];
   };
 
   for (const line of lines) {
@@ -1424,6 +1603,7 @@ function markdownToEditorHtml(markdown: string): string {
         codeLang = "";
       } else {
         flushParagraph();
+        flushList();
         codeLines = [];
         codeLang = fence[1] ?? "";
       }
@@ -1437,12 +1617,14 @@ function markdownToEditorHtml(markdown: string): string {
 
     if (!line.trim()) {
       flushParagraph();
+      flushList();
       continue;
     }
 
     const youtube = parseYouTubeDirective(line);
     if (youtube) {
       flushParagraph();
+      flushList();
       html.push(editorYouTubeHtml(youtube));
       continue;
     }
@@ -1450,6 +1632,7 @@ function markdownToEditorHtml(markdown: string): string {
     const image = line.match(/^!\[(.*)]\((.*)\)$/);
     if (image) {
       flushParagraph();
+      flushList();
       html.push(editorImageHtml(image[2] ?? "", image[1] ?? "image.png"));
       continue;
     }
@@ -1457,6 +1640,7 @@ function markdownToEditorHtml(markdown: string): string {
     const attachment = line.match(/^\[附件[:：]\s*(.+?)]\((.+)\)$/);
     if (attachment) {
       flushParagraph();
+      flushList();
       html.push(`<div class="editor-attachment" data-fp-type="attachment" data-name="${escapeAttribute(attachment[1] ?? "")}" data-href="${escapeAttribute(attachment[2] ?? "")}" contenteditable="false"><span>${escapeHtml(attachment[1] ?? "")}</span><a href="${escapeAttribute(attachment[2] ?? "")}" download="${escapeAttribute(attachment[1] ?? "")}">下载 / 查看</a></div>`);
       continue;
     }
@@ -1464,11 +1648,24 @@ function markdownToEditorHtml(markdown: string): string {
     const heading = line.match(/^(#{1,6})\s+(.+)$/);
     if (heading) {
       flushParagraph();
+      flushList();
       const level = heading[1]?.length ?? 1;
       html.push(`<h${level}>${formatInlineMarkdown(escapeHtml(heading[2] ?? ""))}</h${level}>`);
       continue;
     }
 
+    const unorderedItem = line.match(/^[-*+]\s+(.+)$/);
+    const orderedItem = line.match(/^\d+[.)]\s+(.+)$/);
+    if (unorderedItem || orderedItem) {
+      flushParagraph();
+      const ordered = Boolean(orderedItem);
+      if (listItems.length && ordered !== listOrdered) flushList();
+      listOrdered = ordered;
+      listItems.push((orderedItem ?? unorderedItem)?.[1] ?? "");
+      continue;
+    }
+
+    flushList();
     paragraph.push(escapeHtml(line));
   }
 
@@ -1476,8 +1673,9 @@ function markdownToEditorHtml(markdown: string): string {
     html.push(`<pre data-lang="${escapeAttribute(codeLang)}"><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
   }
   flushParagraph();
+  flushList();
 
-  return html.join("") || "<p><br></p>";
+  return html.join("");
 }
 
 function editorHtmlToMarkdown(editor: HTMLElement): string {
@@ -1504,6 +1702,16 @@ function nodeToMarkdown(node: Node): string {
 
   if (node.matches('[data-fp-type="pending-media"]')) {
     return "";
+  }
+
+  if (node.matches('[data-fp-type="callout"]')) {
+    const content = node.querySelector<HTMLElement>(":scope > .editor-callout-content");
+    if (!content) return "";
+    const markdown = [...content.childNodes]
+      .map(nodeToMarkdown)
+      .filter((value) => value.trim())
+      .join("\n\n");
+    return calloutDirective(node.dataset.emoji ?? CALLOUT_DEFAULT_EMOJI, markdown);
   }
 
   if (node.matches("figure.editor-image")) {

@@ -4,6 +4,7 @@ import mark from "markdown-it-mark";
 import taskLists from "markdown-it-task-lists";
 import { sanitizeArticleHtml } from "@freedompost/security";
 import {
+  splitCalloutBlocks,
   parseYouTubeDirective,
   youtubeEmbedUrl,
   youtubeWatchUrl,
@@ -35,7 +36,13 @@ export function renderMarkdownArticle(input: RenderArticleInput): RenderedArticl
   const toc: TocItem[] = [];
   const usedIds = new Map<string, number>();
   const md = createMarkdownRenderer(toc, usedIds);
-  const html = renderYouTubeEmbeds(renderAttachmentCards(sanitizeArticleHtml(md.render(input.markdown))));
+  const renderedMarkdown = splitCalloutBlocks(input.markdown)
+    .map((segment) => {
+      if (segment.type === "markdown") return md.render(segment.markdown);
+      return `<aside class="fp-callout" role="note"><span class="fp-callout-emoji" aria-hidden="true">${escapeHtml(segment.emoji)}</span><div class="fp-callout-content">${md.render(segment.markdown)}</div></aside>`;
+    })
+    .join("");
+  const html = renderYouTubeEmbeds(renderAttachmentCards(sanitizeArticleHtml(renderedMarkdown)));
   const searchText = extractSearchText(html);
   const excerpt = makeExcerpt(searchText);
   const meta: ArticleMeta = {
@@ -142,6 +149,7 @@ export function extractSearchText(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<span\b[^>]*class="[^"]*\bfp-callout-emoji\b[^"]*"[^>]*>[\s\S]*?<\/span>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")

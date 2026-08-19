@@ -10,6 +10,8 @@
   --accent-ink: #ffffff;
   --accent-soft: #e9f5ef;
   --danger: #b42318;
+  --callout-border: #f2b56b;
+  --callout-bg: #fff7ed;
   --code-bg: #171b22;
   --code-text: #e7edf3;
   --list-width: 280px;
@@ -29,6 +31,8 @@
   --accent-ink: #102018;
   --accent-soft: #23382d;
   --danger: #ffb4a8;
+  --callout-border: #9a6428;
+  --callout-bg: #332719;
   --code-bg: #111418;
   --code-text: #e7edf3;
 }
@@ -518,6 +522,45 @@ mark {
   border-radius: 0 8px 8px 0;
   background: var(--panel-soft);
   color: var(--muted);
+}
+
+.article-body .fp-callout {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  margin: 1.3em 0;
+  padding: 15px 16px;
+  border: 1px solid var(--callout-border);
+  border-radius: 10px;
+  background: var(--callout-bg);
+  color: var(--text);
+}
+
+.article-body .fp-callout-emoji {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 20px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.article-body .fp-callout-content {
+  min-width: 0;
+}
+
+.article-body .fp-callout-content > :first-child {
+  margin-top: 0;
+}
+
+.article-body .fp-callout-content > :last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 560px) {
+  .article-body .fp-callout {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 8px;
+    padding: 12px;
+  }
 }
 
 .article-body table {
