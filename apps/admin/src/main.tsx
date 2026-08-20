@@ -39,7 +39,8 @@ import {
 import { editorCalloutHtml } from "./editor-callout.js";
 import { editorImageHtml, editorImagesMarkdown, editorYouTubeHtml } from "./editor-media.js";
 import { sanitizePastedEditorHtml } from "./editor-paste.js";
-import { insertBlockPlaceholderAtSelection } from "./editor-selection.js";
+import { focusEditorStart, insertBlockPlaceholderAtSelection } from "./editor-selection.js";
+import { createNewPostPayload } from "./new-post.js";
 import { startPendingMediaInsertion } from "./pending-media-insertion.js";
 import { PendingTaskBarrier } from "./pending-task-barrier.js";
 import "./styles.css";
@@ -194,6 +195,7 @@ function App() {
   const editorRef = useRef<HTMLDivElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const savedRangeRef = useRef<Range | null>(null);
+  const focusCreatedPostRef = useRef<string | null>(null);
   const pendingMediaRef = useRef(new PendingTaskBarrier());
   const activePost = useMemo(() => posts.find((post) => post.id === activeId) ?? posts[0], [posts, activeId]);
 
@@ -204,6 +206,10 @@ function App() {
   useEffect(() => {
     if (!activePost || !editorRef.current) return;
     editorRef.current.innerHTML = markdownToEditorHtml(activePost.markdown);
+    if (focusCreatedPostRef.current === activePost.id) {
+      focusCreatedPostRef.current = null;
+      savedRangeRef.current = focusEditorStart(editorRef.current)?.cloneRange() ?? null;
+    }
   }, [activePost?.id]);
 
   useEffect(() => {
@@ -314,11 +320,7 @@ function App() {
       method: "POST",
       headers: { "content-type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({
-        title: "未命名文章",
-        markdown: "# 未命名文章\n\n开始写作。",
-        visibility: "public"
-      })
+      body: JSON.stringify(createNewPostPayload())
     });
 
     if (!response.ok) {
@@ -327,6 +329,7 @@ function App() {
     }
 
     const created = (await response.json()) as AdminPost;
+    focusCreatedPostRef.current = created.id;
     setPosts((items) => [created, ...items]);
     setActiveId(created.id);
     showToast("文章已创建");
