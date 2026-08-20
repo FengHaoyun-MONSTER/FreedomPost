@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { afterEach, describe, expect, it } from "vitest";
-import { insertBlockPlaceholderAtSelection } from "./editor-selection.js";
+import { focusEditorStart, insertBlockPlaceholderAtSelection } from "./editor-selection.js";
 
 afterEach(() => {
   window.getSelection()?.removeAllRanges();
@@ -90,5 +90,22 @@ describe("insertBlockPlaceholderAtSelection", () => {
     insertBlockPlaceholderAtSelection(editor, placeholder, selection);
 
     expect(placeholder.parentElement).toBe(editor.querySelector(".editor-callout-content"));
+  });
+});
+
+describe("focusEditorStart", () => {
+  it("places the caret at the beginning of an empty editor paragraph", () => {
+    const editor = document.createElement("div");
+    editor.contentEditable = "true";
+    editor.innerHTML = "<p><br></p>";
+    document.body.append(editor);
+
+    focusEditorStart(editor);
+
+    const range = window.getSelection()!.getRangeAt(0);
+    expect(document.activeElement).toBe(editor);
+    expect(range.startContainer).toBe(editor.firstElementChild);
+    expect(range.startOffset).toBe(0);
+    expect(range.collapsed).toBe(true);
   });
 });

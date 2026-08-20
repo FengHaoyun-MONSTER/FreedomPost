@@ -29,6 +29,19 @@ export function insertBlockPlaceholderAtSelection(
   editor.append(placeholder);
 }
 
+/** Focuses the editor and creates a collapsed caret at its first editable position. */
+export function focusEditorStart(editor: HTMLElement, selection: Selection | null = window.getSelection()): Range | null {
+  editor.focus();
+  if (!selection) return null;
+
+  const range = document.createRange();
+  range.selectNodeContents(editor.firstChild ?? editor);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+  return range;
+}
+
 function closestSplittableBlock(node: Node, container: HTMLElement): HTMLElement | null {
   const element = node instanceof Element ? node : node.parentElement;
   const block = element?.closest<HTMLElement>("p,h1,h2,h3,h4,h5,h6,div,blockquote,pre") ?? null;
