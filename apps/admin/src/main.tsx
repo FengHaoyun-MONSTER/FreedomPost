@@ -39,6 +39,7 @@ import {
 import { editorCalloutHtml } from "./editor-callout.js";
 import { editorImageHtml, editorImagesMarkdown, editorYouTubeHtml } from "./editor-media.js";
 import { sanitizePastedEditorHtml } from "./editor-paste.js";
+import { insertBlockPlaceholderAtSelection } from "./editor-selection.js";
 import { startPendingMediaInsertion } from "./pending-media-insertion.js";
 import { PendingTaskBarrier } from "./pending-task-barrier.js";
 import "./styles.css";
@@ -481,18 +482,7 @@ function App() {
 
     editor.focus();
     const selection = window.getSelection();
-    if (selection?.rangeCount && editor.contains(selection.anchorNode)) {
-      const range = selection.getRangeAt(0);
-      const container = closestCalloutContent(selection.anchorNode, editor) ?? editor;
-      const topLevelNode = closestEditorChild(selection.anchorNode, container);
-      if (topLevelNode) topLevelNode.after(placeholder);
-      else {
-        range.deleteContents();
-        range.insertNode(placeholder);
-      }
-    } else {
-      editor.append(placeholder);
-    }
+    insertBlockPlaceholderAtSelection(editor, placeholder, selection);
 
     const nextRange = document.createRange();
     nextRange.setStartAfter(placeholder);
