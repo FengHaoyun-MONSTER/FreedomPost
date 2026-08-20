@@ -109,8 +109,9 @@ export async function openReaderAuthDialog(initialMode: ReaderAuthMode = "login"
 
   const dialog = document.createElement("dialog");
   dialog.className = "reader-auth-dialog";
-  dialog.innerHTML = `<form method="dialog" class="reader-auth-shell"><button class="reader-auth-close" value="cancel" aria-label="关闭">×</button><p class="section-kicker">Reader account</p><h2>读者账户</h2><div class="reader-auth-tabs" role="tablist"><button type="button" data-mode="login">登录</button><button type="button" data-mode="register">注册</button></div><label><span>邮箱或用户名</span><input name="loginName" autocomplete="username" minlength="3" maxlength="128" required /></label><label><span>密码</span><input name="password" type="password" minlength="8" maxlength="128" required /></label><div class="reader-turnstile" aria-label="人机验证"></div><p class="reader-auth-error" role="alert"></p><button class="button primary reader-auth-submit" type="submit"></button><small>无需邮箱或短信验证码。登录态会安全保存在当前浏览器。</small></form>`;
+  dialog.innerHTML = `<form method="dialog" class="reader-auth-shell"><button class="reader-auth-close" type="button" value="cancel" aria-label="关闭">×</button><p class="section-kicker">Reader account</p><h2>读者账户</h2><div class="reader-auth-tabs" role="tablist"><button type="button" data-mode="login">登录</button><button type="button" data-mode="register">注册</button></div><label><span>邮箱或用户名</span><input name="loginName" autocomplete="username" minlength="3" maxlength="128" required /></label><label><span>密码</span><input name="password" type="password" minlength="8" maxlength="128" required /></label><div class="reader-turnstile" aria-label="人机验证"></div><p class="reader-auth-error" role="alert"></p><button class="button primary reader-auth-submit" type="submit"></button><small>无需邮箱或短信验证码。登录态会安全保存在当前浏览器。</small></form>`;
   document.body.append(dialog);
+  bindReaderAuthDismiss(dialog);
   const form = requiredElement(dialog, "form", HTMLFormElement);
   const errorBox = requiredElement(dialog, ".reader-auth-error", HTMLElement);
   const submit = requiredElement(dialog, ".reader-auth-submit", HTMLButtonElement);
@@ -184,6 +185,12 @@ export async function openReaderAuthDialog(initialMode: ReaderAuthMode = "login"
   });
   dialog.showModal();
   try { await completion; } finally { turnstile.remove(widgetId); dialog.remove(); }
+}
+
+export function bindReaderAuthDismiss(dialog: HTMLDialogElement): void {
+  const close = requiredElement(dialog, ".reader-auth-close", HTMLButtonElement);
+  close.type = "button";
+  close.addEventListener("click", () => dialog.close("cancel"));
 }
 
 function renderOrderCreated(container: HTMLElement, orderCode: string, imageURL?: string): void {
