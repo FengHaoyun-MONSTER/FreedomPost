@@ -302,6 +302,15 @@ describe("api app", () => {
     const generatedPassword = access.json().generatedPassword as string;
     const affiliateCookie = access.cookies.find((cookie) => cookie.name === "fp_affiliate_session");
 
+    const referredProducts = await app.inject({ method: "GET", url: "/api/products?ref=wechat_test_01" });
+    const referredProduct = await app.inject({ method: "GET", url: `/api/products/${productResponse.json().slug}?ref=wechat_test_01` });
+
+    const baseCommissionOrder = await app.inject({
+      method: "POST",
+      url: "/api/orders",
+      payload: { productSlug: productResponse.json().slug, recommenderWechatId: "wechat_test_01" }
+    });
+
     const markup = await app.inject({
       method: "PATCH",
       url: "/api/affiliate/markups",
@@ -334,10 +343,25 @@ describe("api app", () => {
     expect(access.statusCode).toBe(200);
     expect(generatedPassword).toHaveLength(10);
     expect(click.json()).toMatchObject({ accepted: true, isUnique: true });
+    expect(referredProducts.json().items[0]).toMatchObject({
+      customerPriceCents: 19900,
+      baseCommissionCents: 2500,
+      markupCommissionCents: 0,
+      commissionCents: 2500
+    });
+    expect(referredProduct.json().item).toMatchObject({ customerPriceCents: 19900, commissionCents: 2500 });
+    expect(baseCommissionOrder.statusCode).toBe(201);
+    expect(baseCommissionOrder.json().order).toMatchObject({ priceCents: 19900, commissionCents: 2500 });
     expect(order.statusCode).toBe(201);
     expect(markup.statusCode).toBe(200);
-    expect(markup.json().items[0]).toMatchObject({ markupPercent: 20, customerPriceCents: 23880, commissionCents: 3980 });
-    expect(order.json().order).toMatchObject({ priceCents: 23880, commissionCents: 3980, orderStatus: "pending", commissionStatus: "not_due" });
+    expect(markup.json().items[0]).toMatchObject({
+      markupPercent: 20,
+      customerPriceCents: 23880,
+      baseCommissionCents: 2500,
+      markupCommissionCents: 3980,
+      commissionCents: 6480
+    });
+    expect(order.json().order).toMatchObject({ priceCents: 23880, commissionCents: 6480, orderStatus: "pending", commissionStatus: "not_due" });
     expect(dashboard.json().dashboard).toMatchObject({ totalClicks: 1, uniqueClicks: 1, completedOrders: 0 });
     expect(wrongPassword.statusCode).toBe(401);
   });
@@ -357,7 +381,7 @@ describe("api app", () => {
     await app.close();
 
     expect(updated.statusCode).toBe(200);
-    expect(updated.json()).toMatchObject({ orderStatus: "completed", commissionStatus: "pending", commissionCents: 0 });
+    expect(updated.json()).toMatchObject({ orderStatus: "completed", commissionStatus: "pending", commissionCents: 600 });
   });
 
   it("extracts managed OSS asset keys without touching external links", () => {

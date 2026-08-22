@@ -19,6 +19,7 @@ import {
   tools as toolsTable
 } from "@freedompost/db";
 import type { Comment } from "@freedompost/shared";
+import { buildAffiliateProductView } from "./affiliate-pricing.js";
 import {
   makePostSlug,
   makeSlug,
@@ -474,7 +475,7 @@ export class PostgresContentRepository implements ContentRepository {
       this.db.select().from(affiliateProductMarkupsTable).where(eq(affiliateProductMarkupsTable.affiliateId, affiliateId))
     ]);
     const overrideMap = new Map(overrides.map((item) => [item.productId, item.markupPercent]));
-    return products.map((product) => withAffiliatePrice(product, overrideMap.get(product.id) ?? defaultMarkupPercent));
+    return products.map((product) => buildAffiliateProductView(product, overrideMap.get(product.id) ?? defaultMarkupPercent));
   }
 
   async setAffiliateMarkup(affiliateId: string, productIds: string[] | null, markupPercent: number): Promise<void> {
@@ -862,11 +863,6 @@ function mapBenefitClaimRow(row: BenefitClaimRow): StoredBenefitClaim {
     createdAt: toIso(row.createdAt),
     updatedAt: toIso(row.updatedAt)
   };
-}
-
-function withAffiliatePrice(product: StoredProduct, markupPercent: number): AffiliateProductView {
-  const customerPriceCents = Math.round(product.priceCents * (100 + markupPercent) / 100);
-  return { ...product, markupPercent, customerPriceCents, commissionCents: customerPriceCents - product.priceCents };
 }
 
 function publicAffiliate(affiliate: StoredAffiliate): Omit<StoredAffiliate, "passwordHash"> {

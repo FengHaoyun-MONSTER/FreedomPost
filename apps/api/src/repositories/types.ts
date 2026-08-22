@@ -129,6 +129,8 @@ export interface AffiliateDashboard {
 export interface AffiliateProductView extends StoredProduct {
   markupPercent: number;
   customerPriceCents: number;
+  baseCommissionCents: number;
+  markupCommissionCents: number;
   commissionCents: number;
 }
 
