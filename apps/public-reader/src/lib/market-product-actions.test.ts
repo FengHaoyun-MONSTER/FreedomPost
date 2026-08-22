@@ -19,4 +19,9 @@ describe("market product actions", () => {
     expect(portalStyles).toMatch(/\.product-dialog-scroll[\s\S]*overflow-y:\s*auto/);
   });
 
+  it("shows the configured commission on product cards and affiliate pricing rows", () => {
+    expect(portalScript).toContain("market-product-commission");
+    expect(portalScript).toContain("专属链接下单每单赚");
+    expect(portalStyles).toContain(".market-product-commission");
+  });
 });
