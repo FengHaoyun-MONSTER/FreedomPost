@@ -1302,24 +1302,44 @@ svg {
   font-size: 12px;
 }
 
-.market-product-body button {
+.market-product-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.market-product-actions button {
+  min-width: 0;
+  min-height: 40px;
+  margin: 0;
+  padding-inline: 8px;
+  white-space: nowrap;
+}
+
+.market-details-button {
   min-height: 36px;
   display: inline-flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 8px;
-  margin-top: 18px;
-  padding: 0;
-  border: 0;
+  border: 1px solid var(--portal-line-strong);
+  border-radius: 8px;
   background: transparent;
   color: var(--portal-accent);
   font-weight: 700;
-  text-align: left;
 }
 
-.market-product-body button svg {
+.market-details-button svg {
   width: 16px;
   height: 16px;
+}
+
+.market-product-actions button:disabled,
+.product-dialog-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
 }
 
 .product-dialog {
@@ -1331,6 +1351,24 @@ svg {
   border-radius: 8px;
   background: var(--portal-panel);
   color: var(--portal-text);
+}
+
+.product-details-dialog {
+  overflow: hidden;
+  padding: 0;
+}
+
+.product-details-dialog #productDialogContent {
+  max-height: min(760px, calc(100vh - 32px));
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.product-dialog-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 30px;
+  overscroll-behavior: contain;
 }
 
 .product-dialog::backdrop {
@@ -1402,8 +1440,16 @@ svg {
   gap: 10px;
 }
 
+.product-details-dialog .product-dialog-actions {
+  padding: 16px 30px 24px;
+  border-top: 1px solid var(--portal-line);
+  background: var(--portal-panel);
+  box-shadow: 0 -12px 28px rgb(0 0 0 / 10%);
+}
+
 .product-dialog-actions .button {
   width: 100%;
+  margin-top: 0;
 }
 
 .affiliate-section {
@@ -2285,6 +2331,14 @@ svg {
     gap: 12px;
   }
 
+  .market-product-actions button {
+    font-size: 13px;
+  }
+
+  .market-details-button svg {
+    display: none;
+  }
+
   .tools-page-head {
     align-items: stretch;
     flex-direction: column;
@@ -2990,7 +3044,27 @@ svg {
     border-radius: 22px;
   }
 
-  .product-dialog-cover {
+  .product-details-dialog {
+    padding: 0;
+  }
+
+  .product-details-dialog #productDialogContent {
+    max-height: calc(100dvh - 20px);
+  }
+
+  .product-details-dialog .product-dialog-scroll {
+    padding: 24px 18px;
+  }
+
+  .product-details-dialog .product-dialog-actions {
+    padding: 12px 18px max(14px, env(safe-area-inset-bottom));
+  }
+
+  .product-dialog:not(.product-details-dialog) .product-dialog-cover {
+    margin: -24px -18px 20px;
+  }
+
+  .product-details-dialog .product-dialog-cover {
     margin: -24px -18px 20px;
   }
 
