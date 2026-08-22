@@ -1305,6 +1305,7 @@ svg {
 .market-product-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
   gap: 8px;
   margin-top: 18px;
 }
@@ -1314,6 +1315,34 @@ svg {
   min-height: 40px;
   margin: 0;
   padding-inline: 8px;
+  white-space: nowrap;
+}
+
+.market-product-share {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+
+.market-product-share .button {
+  width: 100%;
+}
+
+.market-product-commission {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--portal-accent) 62%, var(--portal-line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--portal-accent) 18%, var(--portal-panel));
+  box-shadow: 0 0 16px color-mix(in srgb, var(--portal-accent) 18%, transparent);
+  color: var(--portal-accent);
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.2;
   white-space: nowrap;
 }
 

@@ -9,6 +9,7 @@ import {
 } from "../lib/article-links.js";
 import { portalActivePath, portalMobileActivePath } from "../lib/portal-routes.js";
 import { createPortalPageLifecycle, eventPathIncludes } from "../lib/portal-page-lifecycle.js";
+import { formatCommissionEarnings } from "../lib/market-commission.js";
 import { renderOrderReferralField } from "../lib/market-order.js";
 
 type PostListItem = {
@@ -593,7 +594,7 @@ function renderMarketProduct(product: StoreProduct) {
       <div class="market-product-bottom"><div class="market-product-price"><strong>${formatCurrency(displayPrice, product.currency)}</strong>${compareAt}</div><span>${availability}</span></div>
       <div class="market-product-actions">
         <button class="market-details-button" type="button" data-market-action="details" data-product-slug="${escapeAttribute(product.slug)}">查看详情 <i data-lucide="arrow-up-right"></i></button>
-        <button class="button secondary" type="button" data-market-action="share" data-product-slug="${escapeAttribute(product.slug)}">分享赚钱</button>
+        <div class="market-product-share"><button class="button secondary" type="button" data-market-action="share" data-product-slug="${escapeAttribute(product.slug)}">分享赚钱</button><span class="market-product-commission">每单赚${escapeHtml(formatCommissionEarnings(product.commissionCents, product.currency))}</span></div>
         <button class="button primary" type="button" data-market-action="order" data-product-slug="${escapeAttribute(product.slug)}" ${product.stock === 0 ? "disabled" : ""}>立即下单</button>
       </div>
     </div>
@@ -782,7 +783,7 @@ async function hydrateAffiliatePricing() {
   if (!response.ok) return;
   const items = ((await response.json()) as { items: AffiliateProduct[] }).items;
   list.innerHTML = items.length
-    ? items.map((item) => `<label class="affiliate-product-price-row"><input type="checkbox" data-pricing-product="${escapeAttribute(item.id)}" /><span><strong>${escapeHtml(item.title)}</strong><small>管理员价 ${formatCurrency(item.priceCents, item.currency)} · 专属价 ${formatCurrency(item.customerPriceCents, item.currency)}</small></span><b>${item.markupPercent}%</b></label>`).join("")
+    ? items.map((item) => `<label class="affiliate-product-price-row"><input type="checkbox" data-pricing-product="${escapeAttribute(item.id)}" /><span><strong>${escapeHtml(item.title)}</strong><small>管理员价 ${formatCurrency(item.priceCents, item.currency)} · 专属价 ${formatCurrency(item.customerPriceCents, item.currency)} · 专属链接下单每单赚${escapeHtml(formatCommissionEarnings(item.commissionCents, item.currency))}</small></span><b>${item.markupPercent}%</b></label>`).join("")
     : `<p class="affiliate-no-orders">暂无已发布商品</p>`;
   document.querySelector<HTMLButtonElement>("#applyAffiliateDefault")?.addEventListener("click", () => void applyAffiliateMarkup(null));
   document.querySelector<HTMLButtonElement>("#applyAffiliateSelected")?.addEventListener("click", () => {
