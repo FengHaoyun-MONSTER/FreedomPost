@@ -9,6 +9,7 @@ import {
 } from "../lib/article-links.js";
 import { portalActivePath, portalMobileActivePath } from "../lib/portal-routes.js";
 import { createPortalPageLifecycle, eventPathIncludes } from "../lib/portal-page-lifecycle.js";
+import { renderOrderReferralField } from "../lib/market-order.js";
 
 type PostListItem = {
   slug: string;
@@ -448,18 +449,28 @@ async function hydrateMarket() {
     grid.innerHTML = visible.map(renderMarketProduct).join("");
     empty.hidden = visible.length > 0;
     count.textContent = `${visible.length} 件在售商品`;
-    grid.querySelectorAll<HTMLButtonElement>("[data-product-slug]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const product = products.find((item) => item.slug === button.dataset.productSlug);
-        if (!product) return;
-        dialogContent.innerHTML = renderProductDialog(product);
-        dialog.showModal();
-        bindProductDialogActions(product, dialog, orderDialog, orderDialogContent);
-        createPortalIcons();
-      });
-    });
     createPortalIcons();
   };
+
+  grid.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element)) return;
+    const button = event.target.closest<HTMLButtonElement>("[data-market-action][data-product-slug]");
+    if (!button || !grid.contains(button)) return;
+    const product = products.find((item) => item.slug === button.dataset.productSlug);
+    if (!product) return;
+
+    switch (button.dataset.marketAction) {
+      case "details":
+        openProductDetails(product, dialog, dialogContent, orderDialog, orderDialogContent);
+        break;
+      case "share":
+        void shareMarketProduct(product, button);
+        break;
+      case "order":
+        openProductOrder(product, orderDialog, orderDialogContent);
+        break;
+    }
+  });
 
   filters.querySelectorAll<HTMLButtonElement>("[data-category]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -489,10 +500,7 @@ async function hydrateMarket() {
     const requestedProduct = new URLSearchParams(location.search).get("product");
     const product = products.find((item) => item.slug === requestedProduct);
     if (product) {
-      dialogContent.innerHTML = renderProductDialog(product);
-      dialog.showModal();
-      bindProductDialogActions(product, dialog, orderDialog, orderDialogContent);
-      createPortalIcons();
+      openProductDetails(product, dialog, dialogContent, orderDialog, orderDialogContent);
     }
   } catch {
     count.textContent = "商品加载失败";
@@ -582,8 +590,12 @@ function renderMarketProduct(product: StoreProduct) {
       <span class="market-product-category">${escapeHtml(productCategoryLabel(product.category))}</span>
       <h2>${escapeHtml(product.title)}</h2>
       <p>${escapeHtml(product.summary)}</p>
-    <div class="market-product-bottom"><div class="market-product-price"><strong>${formatCurrency(displayPrice, product.currency)}</strong>${compareAt}</div><span>${availability}</span></div>
-      <button type="button" data-product-slug="${escapeAttribute(product.slug)}">查看详情 <i data-lucide="arrow-up-right"></i></button>
+      <div class="market-product-bottom"><div class="market-product-price"><strong>${formatCurrency(displayPrice, product.currency)}</strong>${compareAt}</div><span>${availability}</span></div>
+      <div class="market-product-actions">
+        <button class="market-details-button" type="button" data-market-action="details" data-product-slug="${escapeAttribute(product.slug)}">查看详情 <i data-lucide="arrow-up-right"></i></button>
+        <button class="button secondary" type="button" data-market-action="share" data-product-slug="${escapeAttribute(product.slug)}">分享赚钱</button>
+        <button class="button primary" type="button" data-market-action="order" data-product-slug="${escapeAttribute(product.slug)}" ${product.stock === 0 ? "disabled" : ""}>立即下单</button>
+      </div>
     </div>
   </article>`;
 }
@@ -593,24 +605,36 @@ function renderProductDialog(product: StoreProduct) {
   const cover = product.coverUrl ? `<img src="${escapeAttribute(product.coverUrl)}" alt="${escapeAttribute(product.title)}" />` : "";
   const availability = product.stock === 0 ? `已售出 ${product.soldCount} · 暂时售罄` : product.stock < 0 ? `已售出 ${product.soldCount} · 不限量供应` : `已售出 ${product.soldCount} · 当前库存 ${product.stock}`;
   const commission = product.commissionCents > 0 ? ` · 可得 ${formatCurrency(product.commissionCents, product.currency)}` : "";
-  return `<div class="product-dialog-cover">${cover}</div><p class="section-kicker">${escapeHtml(productCategoryLabel(product.category))}</p><h2>${escapeHtml(product.title)}</h2><p class="product-dialog-summary">${escapeHtml(product.summary)}</p><div class="product-dialog-price">${formatCurrency(displayPrice, product.currency)} <span>${availability}</span></div><div class="product-dialog-description">${escapeHtml(product.description).replace(/\n/g, "<br>")}</div><div class="product-dialog-actions"><button class="button secondary" type="button" data-share-product>分享此商品赚钱${escapeHtml(commission)}</button><button class="button primary" type="button" data-order-product ${product.stock === 0 ? "disabled" : ""}>立即下单</button></div>`;
+  return `<div class="product-dialog-scroll"><div class="product-dialog-cover">${cover}</div><p class="section-kicker">${escapeHtml(productCategoryLabel(product.category))}</p><h2>${escapeHtml(product.title)}</h2><p class="product-dialog-summary">${escapeHtml(product.summary)}</p><div class="product-dialog-price">${formatCurrency(displayPrice, product.currency)} <span>${availability}</span></div><div class="product-dialog-description">${escapeHtml(product.description).replace(/\n/g, "<br>")}</div></div><div class="product-dialog-actions"><button class="button secondary" type="button" data-share-product>分享此商品赚钱${escapeHtml(commission)}</button><button class="button primary" type="button" data-order-product ${product.stock === 0 ? "disabled" : ""}>立即下单</button></div>`;
+}
+
+function openProductDetails(product: StoreProduct, productDialog: HTMLDialogElement, content: HTMLElement, orderDialog: HTMLDialogElement, orderContent: HTMLElement) {
+  content.innerHTML = renderProductDialog(product);
+  productDialog.showModal();
+  bindProductDialogActions(product, productDialog, orderDialog, orderContent);
+  createPortalIcons();
 }
 
 function bindProductDialogActions(product: StoreProduct, productDialog: HTMLDialogElement, orderDialog: HTMLDialogElement, content: HTMLElement) {
   productDialog.querySelector<HTMLButtonElement>("[data-share-product]")?.addEventListener("click", (event) => {
-    void shareMarketProduct(product, productDialog, event.currentTarget as HTMLButtonElement);
+    void shareMarketProduct(product, event.currentTarget as HTMLButtonElement, productDialog);
   });
   productDialog.querySelector<HTMLButtonElement>("[data-order-product]")?.addEventListener("click", () => {
-    const ref = lockedReferral();
-    const displayPrice = product.customerPriceCents ?? product.priceCents;
-    content.innerHTML = `<p class="section-kicker">Order</p><h2>提交下单信息</h2><p class="product-dialog-summary">${escapeHtml(product.title)} · ${formatCurrency(displayPrice, product.currency)}</p><form id="affiliateOrderForm" class="order-form"><label><span>推荐人微信号</span><input name="recommenderWechatId" maxlength="32" required value="${escapeAttribute(ref ?? "")}" ${ref ? "readonly" : ""} placeholder="填写推荐人的微信号" /></label><p>提交后会生成订单号，请添加客服微信或 QQ 完成人工交易。</p><button class="button primary" type="submit">生成订单号</button><p class="form-error" role="alert" hidden></p></form>`;
-    productDialog.close();
-    orderDialog.showModal();
-    content.querySelector<HTMLFormElement>("#affiliateOrderForm")?.addEventListener("submit", (event) => void submitAffiliateOrder(event, product, content));
+    openProductOrder(product, orderDialog, content, productDialog);
   });
 }
 
-async function shareMarketProduct(product: StoreProduct, productDialog: HTMLDialogElement, button: HTMLButtonElement) {
+function openProductOrder(product: StoreProduct, orderDialog: HTMLDialogElement, content: HTMLElement, productDialog?: HTMLDialogElement) {
+  const ref = lockedReferral();
+  const displayPrice = product.customerPriceCents ?? product.priceCents;
+  const referralField = renderOrderReferralField(ref);
+  content.innerHTML = `<p class="section-kicker">Order</p><h2>提交下单信息</h2><p class="product-dialog-summary">${escapeHtml(product.title)} · ${formatCurrency(displayPrice, product.currency)}</p><form id="affiliateOrderForm" class="order-form">${referralField}<p>提交后会生成订单号，请添加客服微信或 QQ 完成人工交易。</p><button class="button primary" type="submit">生成订单号</button><p class="form-error" role="alert" hidden></p></form>`;
+  if (productDialog?.open) productDialog.close();
+  if (!orderDialog.open) orderDialog.showModal();
+  content.querySelector<HTMLFormElement>("#affiliateOrderForm")?.addEventListener("submit", (event) => void submitAffiliateOrder(event, product, content));
+}
+
+async function shareMarketProduct(product: StoreProduct, button: HTMLButtonElement, productDialog?: HTMLDialogElement) {
   button.disabled = true;
   try {
     const response = await fetch("/api/affiliate/dashboard", { headers: { Accept: "application/json" } });
@@ -619,7 +643,7 @@ async function shareMarketProduct(product: StoreProduct, productDialog: HTMLDial
       const shareUrl = new URL(result.shareUrl);
       shareUrl.searchParams.set("product", product.slug);
       await copyTextToClipboard(shareUrl.toString());
-      productDialog.close();
+      if (productDialog?.open) productDialog.close();
       showPortalToast("分享链接复制成功", { center: true, success: true, duration: 2000 });
       return;
     }
@@ -628,7 +652,7 @@ async function shareMarketProduct(product: StoreProduct, productDialog: HTMLDial
       const destination = new URL("/earn/", location.origin);
       destination.searchParams.set("product", product.slug);
       addLockedReferral(destination);
-      productDialog.close();
+      if (productDialog?.open) productDialog.close();
       await loadRoute(destination, true);
       return;
     }
