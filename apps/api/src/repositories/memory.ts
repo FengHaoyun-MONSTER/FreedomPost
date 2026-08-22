@@ -1,5 +1,6 @@
 import { POST_INITIAL_VIEW_COUNT, POST_VIEW_INCREMENT } from "@freedompost/db";
 import type { Comment } from "@freedompost/shared";
+import { buildAffiliateProductView } from "./affiliate-pricing.js";
 import {
   makePostSlug,
   makeSlug,
@@ -338,8 +339,7 @@ export class MemoryContentRepository implements ContentRepository {
     if (!affiliate) return [];
     return (await this.listProducts({ publishedOnly: true })).map((product) => {
       const markupPercent = this.affiliateProductMarkups.get(`${affiliateId}:${product.id}`) ?? affiliate.defaultMarkupPercent;
-      const customerPriceCents = Math.round(product.priceCents * (100 + markupPercent) / 100);
-      return { ...product, markupPercent, customerPriceCents, commissionCents: customerPriceCents - product.priceCents };
+      return buildAffiliateProductView(product, markupPercent);
     });
   }
 
